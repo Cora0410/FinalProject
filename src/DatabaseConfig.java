@@ -68,42 +68,47 @@ public class DatabaseConfig {
         }
     }
     
-    public Connection getConnection() throws SQLException {
-        if (connection == null || connection.isClosed()) {
+    public Connection getConnection() {
+        if (connection == null) {
             try {
                 setupDatabase();
             } catch (SQLException e) {
+                System.err.println("Database connection error: " + e.getMessage());
                 JOptionPane.showMessageDialog(null, 
                     "Database connection error: " + e.getMessage() + "\n\n" +
                     "Make sure:\n" +
-                    "1. MySQL/MariaDB is installed and running\n" +
-                    "2. Username and password in config.properties are correct\n" +
-                    "3. You have mysql-connector-java.jar in your classpath",
+                    "1. MariaDB is installed and running\n" +
+                    "2. Username and password in config.properties are correct",
                     "Database Error", JOptionPane.ERROR_MESSAGE);
-                throw e;
             }
         }
         return connection;
     }
     
     private void setupDatabase() throws SQLException {
-        // First connect to server without specifying database
-        String rootUrl = "jdbc:mysql://" + host + ":" + port + "?useSSL=false";
-        connection = DriverManager.getConnection(rootUrl, username, password);
-        
-        // Create database if it doesn't exist
-        Statement statement = connection.createStatement();
-        statement.executeUpdate("CREATE DATABASE IF NOT EXISTS " + databaseName);
-        
-        // Connect to the specific database
-        connection.close();
-        String dbUrl = "jdbc:mysql://" + host + ":" + port + "/" + databaseName + "?useSSL=false";
-        connection = DriverManager.getConnection(dbUrl, username, password);
-        
-        // Create tables if they don't exist
-        createTables();
-        
-        System.out.println("Database and tables are ready.");
+        try {
+            // Connect to MariaDB server
+            String url = "jdbc:mysql://" + host + ":" + port;
+            connection = DriverManager.getConnection(url, username, password);
+            
+            // Create database if it doesn't exist
+            Statement statement = connection.createStatement();
+            statement.executeUpdate("CREATE DATABASE IF NOT EXISTS " + databaseName);
+            
+            // Switch to the database
+            statement.execute("USE " + databaseName);
+            
+            // Create tables
+            createTables();
+            
+            System.out.println("Database connection successful. Database and tables ready.");
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, 
+                "Database error: " + e.getMessage() + "\n\n" +
+                "Check that MariaDB is running and your credentials are correct.",
+                "MariaDB Connection Error", JOptionPane.ERROR_MESSAGE);
+            throw e;
+        }
     }
     
     private void createTables() {
