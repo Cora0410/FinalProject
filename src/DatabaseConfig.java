@@ -9,13 +9,15 @@ public class DatabaseConfig {
     private int port = 3306;
     private String databaseName = "payroll_system";
     private String username = "root";
-    private String password = "";
+    private String password = "123";
     
     private static DatabaseConfig instance;
     private Connection connection;
     
     private DatabaseConfig() {
         loadConfig();
+        // Initialize connection immediately
+        getConnection();
     }
     
     public static DatabaseConfig getInstance() {
@@ -71,14 +73,44 @@ public class DatabaseConfig {
     public Connection getConnection() {
         if (connection == null) {
             try {
+                // Load JDBC driver explicitly - helps on Windows
+                try {
+                    Class.forName("org.mariadb.jdbc.Driver");
+                    System.out.println("MariaDB JDBC driver loaded successfully");
+                } catch (ClassNotFoundException e) {
+                    try {
+                        // Fall back to MySQL driver if MariaDB driver isn't available
+                        Class.forName("com.mysql.cj.jdbc.Driver");
+                        System.out.println("MySQL JDBC driver loaded successfully");
+                    } catch (ClassNotFoundException e2) {
+                        System.err.println("Neither MariaDB nor MySQL JDBC driver found. Please ensure drivers are in classpath.");
+                        JOptionPane.showMessageDialog(null, 
+                            "JDBC driver not found. Please ensure MariaDB or MySQL JDBC driver is in your classpath.",
+                            "Driver Error", JOptionPane.ERROR_MESSAGE);
+                        return null;
+                    }
+                }
+                
                 setupDatabase();
             } catch (SQLException e) {
                 System.err.println("Database connection error: " + e.getMessage());
-                JOptionPane.showMessageDialog(null, 
-                    "Database connection error: " + e.getMessage() + "\n\n" +
-                    "Make sure:\n" +
+                String errorMessage = "Database connection error: " + e.getMessage() + "\n\n";
+                String solution = "Please ensure:\n" +
                     "1. MariaDB is installed and running\n" +
-                    "2. Username and password in config.properties are correct",
+                    "2. Username and password in config.properties are correct\n" +
+                    "3. No firewall is blocking port " + port + "\n" +
+                    "4. MariaDB is accepting connections from localhost";
+                
+                // Windows-specific suggestions
+                if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                    solution += "\n\nWindows-specific troubleshooting:\n" +
+                        "5. Check Services.msc to verify MariaDB service is running\n" +
+                        "6. Try using 127.0.0.1 instead of localhost in config.properties\n" +
+                        "7. Verify no other process is using port " + port;
+                }
+                
+                JOptionPane.showMessageDialog(null, 
+                    errorMessage + solution,
                     "Database Error", JOptionPane.ERROR_MESSAGE);
             }
         }
@@ -87,24 +119,31 @@ public class DatabaseConfig {
     
     private void setupDatabase() throws SQLException {
         try {
-            // Connect to MariaDB server
-            String url = "jdbc:mysql://" + host + ":" + port;
-            connection = DriverManager.getConnection(url, username, password);
+            // First test if we can connect to the server
+            String serverUrl = "jdbc:mariadb://" + host + ":" + port;
+            connection = DriverManager.getConnection(serverUrl, username, password);
+            System.out.println("Connected to MariaDB server successfully.");
             
             // Create database if it doesn't exist
             Statement statement = connection.createStatement();
             statement.executeUpdate("CREATE DATABASE IF NOT EXISTS " + databaseName);
             
-            // Switch to the database
-            statement.execute("USE " + databaseName);
+            // Close the connection to server
+            connection.close();
+            
+            // Connect to the specific database
+            String dbUrl = serverUrl + "/" + databaseName;
+            connection = DriverManager.getConnection(dbUrl, username, password);
+            System.out.println("Connected to database: " + databaseName);
             
             // Create tables
             createTables();
             
             System.out.println("Database connection successful. Database and tables ready.");
         } catch (SQLException e) {
+            System.err.println("MariaDB Connection Error: " + e.getMessage());
             JOptionPane.showMessageDialog(null, 
-                "Database error: " + e.getMessage() + "\n\n" +
+                "MariaDB Database error: " + e.getMessage() + "\n\n" +
                 "Check that MariaDB is running and your credentials are correct.",
                 "MariaDB Connection Error", JOptionPane.ERROR_MESSAGE);
             throw e;
@@ -181,6 +220,23 @@ public class DatabaseConfig {
         } catch (SQLException e) {
             System.err.println("SQL Error: " + e.getMessage());
             return null;
+        }
+    }
+    
+    // Test connection and display connection status
+    public boolean testConnection() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                System.out.println("Database connection is active.");
+                return true;
+            } else {
+                System.out.println("Database connection is not active. Attempting to reconnect...");
+                connection = null;
+                return getConnection() != null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error testing connection: " + e.getMessage());
+            return false;
         }
     }
 }

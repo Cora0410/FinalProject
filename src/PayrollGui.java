@@ -1,6 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDate;
+import java.util.List;
 
 public class PayrollGui extends JFrame {
 
@@ -15,10 +16,15 @@ public class PayrollGui extends JFrame {
     
     JTable employeeTable;
     EmployeeTableModel tableModel;
+    EmployeeDAO employeeDAO;
     
     public PayrollGui() {
         setTitle("Philippine Payroll Management System");
         
+        // Initialize DAO with database connection
+        employeeDAO = new EmployeeDAO();
+        
+        // Initialize UI components
         employeeName = new JLabel("Employee Name:");
         employeeId = new JLabel("Employee ID:");
         hourlyRate = new JLabel("Hourly Rate (PHP):");
@@ -81,8 +87,15 @@ public class PayrollGui extends JFrame {
                     double wage = rate * hours;
                     
                     Employee employee = new Employee(id, name, hours, 0, wage, LocalDate.now(), 0, "Present");
-                    tableModel.addEmployee(employee);
-                    clearFields();
+                    
+                    // Save to database and update table model
+                    if (employeeDAO.addEmployee(employee)) {
+                        tableModel.addEmployee(employee);
+                        JOptionPane.showMessageDialog(this, "Employee added successfully!");
+                        clearFields();
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Failed to add employee to database.", "Database Error", JOptionPane.ERROR_MESSAGE);
+                    }
                 } catch (NumberFormatException ex) {
                     JOptionPane.showMessageDialog(this, "Please enter valid numbers for hourly rate and hours worked.");
                 }
@@ -112,8 +125,14 @@ public class PayrollGui extends JFrame {
                         employee.setWage(wage);
                         employee.setDate(LocalDate.now());
                         
-                        tableModel.updateEmployee(selectedRow, employee);
-                        clearFields();
+                        // Update database and table model
+                        if (employeeDAO.updateEmployee(employee)) {
+                            tableModel.updateEmployee(selectedRow, employee);
+                            JOptionPane.showMessageDialog(this, "Employee updated successfully!");
+                            clearFields();
+                        } else {
+                            JOptionPane.showMessageDialog(this, "Failed to update employee in database.", "Database Error", JOptionPane.ERROR_MESSAGE);
+                        }
                     } catch (NumberFormatException ex) {
                         JOptionPane.showMessageDialog(this, "Please enter valid numbers for hourly rate and hours worked.");
                     }
@@ -130,7 +149,16 @@ public class PayrollGui extends JFrame {
             if (selectedRow >= 0) {
                 int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this employee?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
-                    tableModel.removeEmployee(selectedRow);
+                    Employee employee = tableModel.getEmployee(selectedRow);
+                    
+                    // Delete from database and update table model
+                    if (employeeDAO.deleteEmployee(employee.getId())) {
+                        tableModel.removeEmployee(selectedRow);
+                        JOptionPane.showMessageDialog(this, "Employee deleted successfully!");
+                        clearFields();
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Failed to delete employee from database.", "Database Error", JOptionPane.ERROR_MESSAGE);
+                    }
                 }
             } else {
                 JOptionPane.showMessageDialog(this, "Please select an employee to delete.");
@@ -139,22 +167,27 @@ public class PayrollGui extends JFrame {
         
         processPayroll.addActionListener(e -> {
             System.out.println("Process Payroll clicked");
+            JOptionPane.showMessageDialog(this, "Payroll processing functionality will be implemented in future updates.");
         });
         
         generateReport.addActionListener(e -> {
             System.out.println("Generate Reports clicked");
+            JOptionPane.showMessageDialog(this, "Report generation functionality will be implemented in future updates.");
         });
         
         calculateOvertime.addActionListener(e -> {
             System.out.println("Calculate Overtime clicked");
+            JOptionPane.showMessageDialog(this, "Overtime calculation functionality will be implemented in future updates.");
         });
         
         viewAttendance.addActionListener(e -> {
             System.out.println("View Attendance clicked");
+            JOptionPane.showMessageDialog(this, "Attendance viewing functionality will be implemented in future updates.");
         });
         
         generatePayslip.addActionListener(e -> {
             System.out.println("Generate Payslip clicked");
+            JOptionPane.showMessageDialog(this, "Payslip generation functionality will be implemented in future updates.");
         });
         
         employeeTable.getSelectionModel().addListSelectionListener(e -> {
@@ -174,10 +207,21 @@ public class PayrollGui extends JFrame {
         
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        
+        // Load employees from database on startup
+        loadEmployeesFromDatabase();
+        
         setVisible(true);
         
         employeeTable.setRowSelectionAllowed(true);
         employeeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // Test database connection
+        if (DatabaseConfig.getInstance().testConnection()) {
+            setTitle("Philippine Payroll Management System - Connected to Database");
+        } else {
+            setTitle("Philippine Payroll Management System - Database Connection Failed");
+        }
     }
     
     private void addToContainer(Component component, int gridx, int gridy, int gridwidth, int gridheight) {
@@ -201,5 +245,18 @@ public class PayrollGui extends JFrame {
         employeeIdField.setText("");
         hourlyRateField.setText("");
         hoursWorkedField.setText("");
+    }
+    
+    private void loadEmployeesFromDatabase() {
+        // Clear existing data
+        tableModel.clearAll();
+        
+        // Load employees from database
+        List<Employee> employees = employeeDAO.getEmployeesWithPayroll();
+        for (Employee employee : employees) {
+            tableModel.addEmployee(employee);
+        }
+        
+        System.out.println("Loaded " + employees.size() + " employees from database.");
     }
 }
