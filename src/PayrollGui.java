@@ -1,5 +1,6 @@
 import javax.swing.*;
 import java.awt.*;
+import java.time.LocalDate;
 
 public class PayrollGui extends JFrame {
 
@@ -13,6 +14,7 @@ public class PayrollGui extends JFrame {
     GridBagLayout layout;
     
     JTable employeeTable;
+    EmployeeTableModel tableModel;
     
     public PayrollGui() {
         setTitle("Philippine Payroll Management System");
@@ -35,10 +37,9 @@ public class PayrollGui extends JFrame {
         calculateOvertime = new JButton("Calculate Overtime");
         viewAttendance = new JButton("View Attendance");
         generatePayslip = new JButton("Generate Payslip");
-
-        String[] columnNames = {"ID", "Name", "Total Hours", "Overtime", "Wage", "Date", "Tax Deductions", "Attendance"};
-        Object[][] data = {};
-        employeeTable = new JTable(data, columnNames);
+        
+        tableModel = new EmployeeTableModel();
+        employeeTable = new JTable(tableModel);
         JScrollPane tableScrollPane = new JScrollPane(employeeTable);
         
         container = this.getContentPane();
@@ -70,17 +71,70 @@ public class PayrollGui extends JFrame {
         addEmployee.addActionListener(e -> {
             String name = employeeNameField.getText();
             String id = employeeIdField.getText();
+            String hourlyRateText = hourlyRateField.getText();
+            String hoursWorkedText = hoursWorkedField.getText();
             
-            System.out.println("Add Employee: " + name + " (ID: " + id + ")");
-            clearFields();
+            if (!name.isEmpty() && !id.isEmpty() && !hourlyRateText.isEmpty() && !hoursWorkedText.isEmpty()) {
+                try {
+                    double rate = Double.parseDouble(hourlyRateText);
+                    double hours = Double.parseDouble(hoursWorkedText);
+                    double wage = rate * hours;
+                    
+                    Employee employee = new Employee(id, name, hours, 0, wage, LocalDate.now(), 0, "Present");
+                    tableModel.addEmployee(employee);
+                    clearFields();
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(this, "Please enter valid numbers for hourly rate and hours worked.");
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Please fill in all fields.");
+            }
         });
         
         updateEmployee.addActionListener(e -> {
-            System.out.println("Update Employee clicked");
+            int selectedRow = employeeTable.getSelectedRow();
+            if (selectedRow >= 0) {
+                String name = employeeNameField.getText();
+                String id = employeeIdField.getText();
+                String hourlyRateText = hourlyRateField.getText();
+                String hoursWorkedText = hoursWorkedField.getText();
+                
+                if (!name.isEmpty() && !id.isEmpty() && !hourlyRateText.isEmpty() && !hoursWorkedText.isEmpty()) {
+                    try {
+                        double rate = Double.parseDouble(hourlyRateText);
+                        double hours = Double.parseDouble(hoursWorkedText);
+                        double wage = rate * hours;
+                        
+                        Employee employee = tableModel.getEmployee(selectedRow);
+                        employee.setName(name);
+                        employee.setId(id);
+                        employee.setTotalHours(hours);
+                        employee.setWage(wage);
+                        employee.setDate(LocalDate.now());
+                        
+                        tableModel.updateEmployee(selectedRow, employee);
+                        clearFields();
+                    } catch (NumberFormatException ex) {
+                        JOptionPane.showMessageDialog(this, "Please enter valid numbers for hourly rate and hours worked.");
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(this, "Please fill in all fields.");
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Please select an employee to update.");
+            }
         });
         
         deleteEmployee.addActionListener(e -> {
-            System.out.println("Delete Employee clicked");
+            int selectedRow = employeeTable.getSelectedRow();
+            if (selectedRow >= 0) {
+                int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this employee?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
+                if (confirm == JOptionPane.YES_OPTION) {
+                    tableModel.removeEmployee(selectedRow);
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Please select an employee to delete.");
+            }
         });
         
         processPayroll.addActionListener(e -> {
@@ -101,6 +155,21 @@ public class PayrollGui extends JFrame {
         
         generatePayslip.addActionListener(e -> {
             System.out.println("Generate Payslip clicked");
+        });
+        
+        employeeTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int selectedRow = employeeTable.getSelectedRow();
+                if (selectedRow >= 0) {
+                    Employee employee = tableModel.getEmployee(selectedRow);
+                    employeeNameField.setText(employee.getName());
+                    employeeIdField.setText(employee.getId());
+                    hoursWorkedField.setText(String.valueOf(employee.getTotalHours()));
+                    if (employee.getTotalHours() > 0) {
+                        hourlyRateField.setText(String.valueOf(employee.getWage() / employee.getTotalHours()));
+                    }
+                }
+            }
         });
         
         setSize(800, 600);
