@@ -87,7 +87,12 @@ public class EmployeeTableModel extends AbstractTableModel {
     
     public void clearAll() {
         int size = employees.size();
-        employees.clear();
-        fireTableRowsDeleted(0, size - 1);
+        if (size > 0) {
+            employees.clear();
+            fireTableRowsDeleted(0, size - 1);
+        } else {
+
+            employees.clear();
+        }
     }
 }
