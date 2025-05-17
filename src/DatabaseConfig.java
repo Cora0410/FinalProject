@@ -1,6 +1,7 @@
 import java.io.*;
 import java.sql.*;
 import java.util.Properties;
+import javax.swing.JOptionPane;
 
 public class DatabaseConfig {
     // Default database parameters
@@ -12,6 +13,7 @@ public class DatabaseConfig {
     
     private static DatabaseConfig instance;
     private Connection connection;
+    private boolean configValidated = false;
     
     private DatabaseConfig() {
         loadConfig();
@@ -68,7 +70,41 @@ public class DatabaseConfig {
         }
     }
     
+    public boolean validateConnection() {
+        Connection testConnection = null;
+        try {
+            String rootUrl = "jdbc:mysql://" + host + ":" + port;
+            testConnection = DriverManager.getConnection(rootUrl, username, password);
+            testConnection.close();
+            configValidated = true;
+            return true;
+        } catch (SQLException e) {
+            String errorMessage = "Database connection error: " + e.getMessage();
+            System.err.println(errorMessage);
+            JOptionPane.showMessageDialog(null, 
+                "Could not connect to the database server.\n" +
+                "Please check your credentials in config.properties file.\n\n" +
+                "Error: " + e.getMessage(),
+                "Database Connection Error", 
+                JOptionPane.ERROR_MESSAGE);
+            configValidated = false;
+            return false;
+        } finally {
+            try {
+                if (testConnection != null && !testConnection.isClosed()) {
+                    testConnection.close();
+                }
+            } catch (SQLException e) {
+                System.err.println("Error closing test connection: " + e.getMessage());
+            }
+        }
+    }
+    
     public Connection getConnection() throws SQLException {
+        if (!configValidated && !validateConnection()) {
+            throw new SQLException("Database configuration is not valid. Please check your credentials.");
+        }
+        
         if (connection == null || connection.isClosed()) {
             setupDatabase();
         }
@@ -87,15 +123,19 @@ public class DatabaseConfig {
             
             // Connect to the specific database
             connection.close();
-            String dbUrl = rootUrl + "/" + databaseName;
+            String dbUrl = rootUrl + "/" + databaseName + "?useSSL=false";
             connection = DriverManager.getConnection(dbUrl, username, password);
             
             // Create tables if they don't exist
             createTables();
             
-            System.out.println("Database connection established.");
+            System.out.println("Database and tables are ready.");
         } catch (SQLException e) {
-            System.err.println("Database connection error: " + e.getMessage());
+            System.err.println("Database setup error: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, 
+                "Error setting up the database: " + e.getMessage(), 
+                "Database Setup Error", 
+                JOptionPane.ERROR_MESSAGE);
         }
     }
     
@@ -151,12 +191,14 @@ public class DatabaseConfig {
     }
     
     // Helper methods to interact with the database
-    public void executeUpdate(String sql) {
+    public boolean executeUpdate(String sql) {
         try {
             Statement statement = getConnection().createStatement();
             statement.executeUpdate(sql);
+            return true;
         } catch (SQLException e) {
             System.err.println("SQL Error: " + e.getMessage());
+            return false;
         }
     }
     
@@ -170,44 +212,62 @@ public class DatabaseConfig {
         }
     }
     
-    // Getters and Setters for configuration properties
-    public String getHost() {
-        return host;
+    // Method to update configuration and save to file
+    public boolean updateConfiguration(String host, int port, String database, String username, String password) {
+        this.host = host;
+        this.port = port;
+        this.databaseName = database;
+        this.username = username;
+        this.password = password;
+        
+        // Test if the new configuration works
+        if (validateConnection()) {
+            // Save the new configuration
+            try {
+                Properties properties = new Properties();
+                properties.setProperty("host", host);
+                properties.setProperty("port", String.valueOf(port));
+                properties.setProperty("database", databaseName);
+                properties.setProperty("username", username);
+                properties.setProperty("password", password);
+                
+                FileOutputStream out = new FileOutputStream("config.properties");
+                properties.store(out, "Database Configuration");
+                out.close();
+                
+                // Reset connection to apply new settings
+                if (connection != null && !connection.isClosed()) {
+                    connection.close();
+                }
+                connection = null;
+                
+                return true;
+            } catch (Exception e) {
+                System.err.println("Error saving configuration: " + e.getMessage());
+                return false;
+            }
+        }
+        return false;
     }
     
-    public void setHost(String host) {
-        this.host = host;
+    // Getters and Setters
+    public String getHost() {
+        return host;
     }
     
     public int getPort() {
         return port;
     }
     
-    public void setPort(int port) {
-        this.port = port;
-    }
-    
     public String getDatabaseName() {
         return databaseName;
-    }
-    
-    public void setDatabaseName(String databaseName) {
-        this.databaseName = databaseName;
     }
     
     public String getUsername() {
         return username;
     }
     
-    public void setUsername(String username) {
-        this.username = username;
-    }
-    
     public String getPassword() {
         return password;
-    }
-    
-    public void setPassword(String password) {
-        this.password = password;
     }
 }
