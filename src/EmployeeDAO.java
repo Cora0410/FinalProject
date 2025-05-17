@@ -56,17 +56,63 @@ public class EmployeeDAO {
     }
     
     public boolean deleteEmployee(String employeeId) {
-        String sql = "DELETE FROM employees WHERE id = ?";
-        try (Connection conn = dbConfig.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        // First delete from related tables to handle foreign key constraints
+        String deletePayrollSQL = "DELETE FROM payroll WHERE employee_id = ?";
+        String deleteAttendanceSQL = "DELETE FROM attendance WHERE employee_id = ?";
+        String deleteEmployeeSQL = "DELETE FROM employees WHERE id = ?";
+        
+        Connection conn = null;
+        PreparedStatement pstmtPayroll = null;
+        PreparedStatement pstmtAttendance = null;
+        PreparedStatement pstmtEmployee = null;
+        
+        try {
+            conn = dbConfig.getConnection();
             
-            pstmt.setString(1, employeeId);
+            // Start transaction
+            conn.setAutoCommit(false);
             
-            int affectedRows = pstmt.executeUpdate();
+            // Delete from payroll table first
+            pstmtPayroll = conn.prepareStatement(deletePayrollSQL);
+            pstmtPayroll.setString(1, employeeId);
+            pstmtPayroll.executeUpdate();
+            
+            // Delete from attendance table next
+            pstmtAttendance = conn.prepareStatement(deleteAttendanceSQL);
+            pstmtAttendance.setString(1, employeeId);
+            pstmtAttendance.executeUpdate();
+            
+            // Finally delete from employees table
+            pstmtEmployee = conn.prepareStatement(deleteEmployeeSQL);
+            pstmtEmployee.setString(1, employeeId);
+            int affectedRows = pstmtEmployee.executeUpdate();
+            
+            // Commit transaction
+            conn.commit();
+            
             return affectedRows > 0;
         } catch (SQLException e) {
+            // Rollback on error
+            try {
+                if (conn != null) conn.rollback();
+            } catch (SQLException ex) {
+                System.err.println("Error rolling back transaction: " + ex.getMessage());
+            }
             System.err.println("Error deleting employee: " + e.getMessage());
             return false;
+        } finally {
+            // Close all resources and restore auto-commit
+            try {
+                if (pstmtPayroll != null) pstmtPayroll.close();
+                if (pstmtAttendance != null) pstmtAttendance.close();
+                if (pstmtEmployee != null) pstmtEmployee.close();
+                if (conn != null) {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                }
+            } catch (SQLException e) {
+                System.err.println("Error closing resources: " + e.getMessage());
+            }
         }
     }
     
