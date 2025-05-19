@@ -9,7 +9,7 @@ public class DatabaseConfig {
     private int port = 3306;
     private String databaseName = "payroll_system";
     private String username = "root";
-    private String password = "ciansmdb851_*!";
+    private String password = "MySQL123&^%6";
     
     private static DatabaseConfig instance;
     
