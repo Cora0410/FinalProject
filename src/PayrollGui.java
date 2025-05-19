@@ -22,8 +22,8 @@ public class PayrollGui extends JFrame {
     JToggleButton allowOvertimeToggle;
     
     // Buttons
-    JButton addEmployee, updateEmployee, deleteEmployee, processPayroll, generateReport;
-    JButton calculateOvertime, viewAttendance, generatePayslip, newEmployeeButton, calculateDeductionsButton;
+    JButton addEmployee, updateEmployee, deleteEmployee, generateReport;
+    JButton viewAttendance, generatePayslip, newEmployeeButton, calculateDeductionsButton;
     JButton viewByDateButton;
     
     Container container;
@@ -97,9 +97,7 @@ public class PayrollGui extends JFrame {
         addEmployee = new JButton("Add Employee");
         updateEmployee = new JButton("Update Employee");
         deleteEmployee = new JButton("Delete Employee");
-        processPayroll = new JButton("Process Payroll");
         generateReport = new JButton("Generate Reports");
-        calculateOvertime = new JButton("Calculate Overtime");
         viewAttendance = new JButton("View Attendance");
         generatePayslip = new JButton("Generate Payslip");
         calculateDeductionsButton = new JButton("Calculate Pay & Deductions");
@@ -242,14 +240,12 @@ public class PayrollGui extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         container.add(actionPanel, gbc);
         
-        // Add button panel
-        JPanel buttonPanel = new JPanel(new GridLayout(2, 4, 5, 5));
+        // Add button panel - removed Calculate Overtime and Process Payroll buttons
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 3, 5, 5));
         buttonPanel.add(addEmployee);
         buttonPanel.add(updateEmployee);
         buttonPanel.add(deleteEmployee);
-        buttonPanel.add(processPayroll);
         buttonPanel.add(generateReport);
-        buttonPanel.add(calculateOvertime);
         buttonPanel.add(viewAttendance);
         buttonPanel.add(generatePayslip);
         
@@ -584,16 +580,8 @@ public class PayrollGui extends JFrame {
             }
         });
         
-        processPayroll.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Payroll processing functionality will be implemented in future updates.");
-        });
-        
         generateReport.addActionListener(e -> {
             JOptionPane.showMessageDialog(this, "Report generation functionality will be implemented in future updates.");
-        });
-        
-        calculateOvertime.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Overtime calculation functionality will be implemented in future updates.");
         });
         
         viewAttendance.addActionListener(e -> {
