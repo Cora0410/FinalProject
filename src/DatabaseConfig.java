@@ -9,7 +9,7 @@ public class DatabaseConfig {
     private int port = 3306;
     private String databaseName = "payroll_system";
     private String username = "root";
-    private String password = "MySQL123&^%6";
+    private String password = "123";
     
     private static DatabaseConfig instance;
     
@@ -137,7 +137,7 @@ public class DatabaseConfig {
         try {
             Statement statement = connection.createStatement();
             
-            // Create Employee table
+            // Create Employee table - basic employee info, ID is primary key
             String createEmployeeTable = "CREATE TABLE IF NOT EXISTS employees (" +
                     "id VARCHAR(20) PRIMARY KEY," +
                     "name VARCHAR(100) NOT NULL," +
@@ -149,7 +149,7 @@ public class DatabaseConfig {
                     ")";
             statement.executeUpdate(createEmployeeTable);
             
-            // Create Payroll table
+            // Create Payroll table - payroll_id as primary key, daily records possible
             String createPayrollTable = "CREATE TABLE IF NOT EXISTS payroll (" +
                     "payroll_id INT AUTO_INCREMENT PRIMARY KEY," +
                     "employee_id VARCHAR(20)," +
@@ -157,16 +157,17 @@ public class DatabaseConfig {
                     "overtime DOUBLE," +
                     "wage DOUBLE," +
                     "date DATE," +
-                    "tax_deductions DOUBLE," +
                     "sss_deduction DOUBLE," +
                     "philhealth_deduction DOUBLE," +
                     "pagibig_deduction DOUBLE," +
+                    "tax_deductions DOUBLE," +
                     "net_pay DOUBLE," +
-                    "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE" +
+                    "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE," +
+                    "UNIQUE KEY employee_date (employee_id, date)" +  // Allow only one record per employee per day
                     ")";
             statement.executeUpdate(createPayrollTable);
             
-            // Create Attendance table
+            // Create Attendance table - attendance_id as primary key, daily records possible
             String createAttendanceTable = "CREATE TABLE IF NOT EXISTS attendance (" +
                     "attendance_id INT AUTO_INCREMENT PRIMARY KEY," +
                     "employee_id VARCHAR(20)," +
@@ -174,7 +175,8 @@ public class DatabaseConfig {
                     "status VARCHAR(20)," +
                     "time_in TIME," +
                     "time_out TIME," +
-                    "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE" +
+                    "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE," +
+                    "UNIQUE KEY employee_date (employee_id, date)" +  // Allow only one attendance record per employee per day
                     ")";
             statement.executeUpdate(createAttendanceTable);
             
