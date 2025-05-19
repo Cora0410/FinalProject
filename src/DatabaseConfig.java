@@ -12,12 +12,9 @@ public class DatabaseConfig {
     private String password = "ciansmdb851_*!";
     
     private static DatabaseConfig instance;
-    private Connection connection;
     
     private DatabaseConfig() {
         loadConfig();
-        // Initialize connection immediately
-        getConnection();
     }
     
     public static DatabaseConfig getInstance() {
@@ -71,86 +68,72 @@ public class DatabaseConfig {
     }
     
     public Connection getConnection() {
-        if (connection == null) {
-            try {
-                // Load JDBC driver explicitly - helps on Windows
-                try {
-                    Class.forName("org.mariadb.jdbc.Driver");
-                    System.out.println("MariaDB JDBC driver loaded successfully");
-                } catch (ClassNotFoundException e) {
-                    try {
-                        // Fall back to MySQL driver if MariaDB driver isn't available
-                        Class.forName("com.mysql.cj.jdbc.Driver");
-                        System.out.println("MySQL JDBC driver loaded successfully");
-                    } catch (ClassNotFoundException e2) {
-                        System.err.println("Neither MariaDB nor MySQL JDBC driver found. Please ensure drivers are in classpath.");
-                        JOptionPane.showMessageDialog(null, 
-                            "JDBC driver not found. Please ensure MariaDB or MySQL JDBC driver is in your classpath.",
-                            "Driver Error", JOptionPane.ERROR_MESSAGE);
-                        return null;
-                    }
-                }
-                
-                setupDatabase();
-            } catch (SQLException e) {
-                System.err.println("Database connection error: " + e.getMessage());
-                String errorMessage = "Database connection error: " + e.getMessage() + "\n\n";
-                String solution = "Please ensure:\n" +
-                    "1. MariaDB is installed and running\n" +
-                    "2. Username and password in config.properties are correct\n" +
-                    "3. No firewall is blocking port " + port + "\n" +
-                    "4. MariaDB is accepting connections from localhost";
-                
-                // Windows-specific suggestions
-                if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                    solution += "\n\nWindows-specific troubleshooting:\n" +
-                        "5. Check Services.msc to verify MariaDB service is running\n" +
-                        "6. Try using 127.0.0.1 instead of localhost in config.properties\n" +
-                        "7. Verify no other process is using port " + port;
-                }
-                
-                JOptionPane.showMessageDialog(null, 
-                    errorMessage + solution,
-                    "Database Error", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-        return connection;
-    }
-    
-    private void setupDatabase() throws SQLException {
+        Connection connection = null;
         try {
-            // First test if we can connect to the server
-            String serverUrl = "jdbc:mariadb://" + host + ":" + port;
-            connection = DriverManager.getConnection(serverUrl, username, password);
-            System.out.println("Connected to MariaDB server successfully.");
+            // Load JDBC driver explicitly - helps on Windows
+            try {
+                Class.forName("org.mariadb.jdbc.Driver");
+                System.out.println("MariaDB JDBC driver loaded successfully");
+            } catch (ClassNotFoundException e) {
+                try {
+                    // Fall back to MySQL driver if MariaDB driver isn't available
+                    Class.forName("com.mysql.cj.jdbc.Driver");
+                    System.out.println("MySQL JDBC driver loaded successfully");
+                } catch (ClassNotFoundException e2) {
+                    System.err.println("Neither MariaDB nor MySQL JDBC driver found. Please ensure drivers are in classpath.");
+                    JOptionPane.showMessageDialog(null, 
+                        "JDBC driver not found. Please ensure MariaDB or MySQL JDBC driver is in your classpath.",
+                        "Driver Error", JOptionPane.ERROR_MESSAGE);
+                    return null;
+                }
+            }
             
-            // Create database if it doesn't exist
-            Statement statement = connection.createStatement();
-            statement.executeUpdate("CREATE DATABASE IF NOT EXISTS " + databaseName);
-            
-            // Close the connection to server
-            connection.close();
-            
-            // Connect to the specific database
-            String dbUrl = serverUrl + "/" + databaseName;
+            // Connect to the database
+            String dbUrl = "jdbc:mariadb://" + host + ":" + port + "/" + databaseName;
             connection = DriverManager.getConnection(dbUrl, username, password);
-            System.out.println("Connected to database: " + databaseName);
             
-            // Create tables
-            createTables();
+            // If this is the first time connecting, create tables
+            if (!tablesExist(connection)) {
+                createTables(connection);
+            }
             
-            System.out.println("Database connection successful. Database and tables ready.");
+            return connection;
         } catch (SQLException e) {
-            System.err.println("MariaDB Connection Error: " + e.getMessage());
+            System.err.println("Database connection error: " + e.getMessage());
+            String errorMessage = "Database connection error: " + e.getMessage() + "\n\n";
+            String solution = "Please ensure:\n" +
+                "1. MariaDB is installed and running\n" +
+                "2. Username and password in config.properties are correct\n" +
+                "3. No firewall is blocking port " + port + "\n" +
+                "4. MariaDB is accepting connections from localhost";
+            
+            // Windows-specific suggestions
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                solution += "\n\nWindows-specific troubleshooting:\n" +
+                    "5. Check Services.msc to verify MariaDB service is running\n" +
+                    "6. Try using 127.0.0.1 instead of localhost in config.properties\n" +
+                    "7. Verify no other process is using port " + port;
+            }
+            
             JOptionPane.showMessageDialog(null, 
-                "MariaDB Database error: " + e.getMessage() + "\n\n" +
-                "Check that MariaDB is running and your credentials are correct.",
-                "MariaDB Connection Error", JOptionPane.ERROR_MESSAGE);
-            throw e;
+                errorMessage + solution,
+                "Database Error", JOptionPane.ERROR_MESSAGE);
+            return null;
         }
     }
     
-    private void createTables() {
+    private boolean tablesExist(Connection connection) {
+        try {
+            DatabaseMetaData metaData = connection.getMetaData();
+            ResultSet tables = metaData.getTables(null, null, "employees", null);
+            return tables.next();
+        } catch (SQLException e) {
+            System.err.println("Error checking if tables exist: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    private void createTables(Connection connection) {
         try {
             Statement statement = connection.createStatement();
             
@@ -201,42 +184,80 @@ public class DatabaseConfig {
         }
     }
     
-    // Helper methods to interact with the database
+    // Helper methods to interact with the database with proper connection handling
     public boolean executeUpdate(String sql) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            Statement statement = getConnection().createStatement();
-            statement.executeUpdate(sql);
+            conn = getConnection();
+            stmt = conn.createStatement();
+            stmt.executeUpdate(sql);
             return true;
         } catch (SQLException e) {
             System.err.println("SQL Error: " + e.getMessage());
             return false;
+        } finally {
+            closeResources(stmt, conn);
         }
     }
     
     public ResultSet executeQuery(String sql) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            Statement statement = getConnection().createStatement();
-            return statement.executeQuery(sql);
+            conn = getConnection();
+            stmt = conn.createStatement();
+            return stmt.executeQuery(sql);
         } catch (SQLException e) {
             System.err.println("SQL Error: " + e.getMessage());
+            closeResources(stmt, conn);
             return null;
         }
     }
     
     // Test connection and display connection status
     public boolean testConnection() {
+        Connection conn = null;
         try {
-            if (connection != null && !connection.isClosed()) {
-                System.out.println("Database connection is active.");
-                return true;
-            } else {
-                System.out.println("Database connection is not active. Attempting to reconnect...");
-                connection = null;
-                return getConnection() != null;
+            conn = getConnection();
+            return conn != null;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    System.err.println("Error closing connection: " + e.getMessage());
+                }
             }
-        } catch (SQLException e) {
-            System.err.println("Error testing connection: " + e.getMessage());
-            return false;
         }
+    }
+    
+    // Helper method to close resources
+    public static void closeResources(Statement stmt, Connection conn) {
+        if (stmt != null) {
+            try {
+                stmt.close();
+            } catch (SQLException e) {
+                System.err.println("Error closing statement: " + e.getMessage());
+            }
+        }
+        if (conn != null) {
+            try {
+                conn.close();
+            } catch (SQLException e) {
+                System.err.println("Error closing connection: " + e.getMessage());
+            }
+        }
+    }
+    
+    public static void closeResources(ResultSet rs, Statement stmt, Connection conn) {
+        if (rs != null) {
+            try {
+                rs.close();
+            } catch (SQLException e) {
+                System.err.println("Error closing result set: " + e.getMessage());
+            }
+        }
+        closeResources(stmt, conn);
     }
 }
