@@ -581,8 +581,17 @@ public class PayrollGui extends JFrame {
         });
         
         generatePayslip.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Payslip generation functionality will be implemented in future updates.");
-        });
+    int selectedRow = employeeTable.getSelectedRow();
+    if (selectedRow >= 0) {
+        Employee employee = tableModel.getEmployee(selectedRow);
+        PayslipGenerator payslipGenerator = new PayslipGenerator(employee, this);
+        payslipGenerator.generateAndShowPayslip();
+    } else {
+        JOptionPane.showMessageDialog(this, 
+            "Please select an employee to generate a payslip.", 
+            "No Selection", JOptionPane.WARNING_MESSAGE);
+    }
+});
         
         employeeTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
