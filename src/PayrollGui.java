@@ -20,6 +20,11 @@ public class PayrollGui extends JFrame {
     JButton addEmployee, updateEmployee, deleteEmployee, generateReport;
     JButton viewAttendanceByDate, viewAllAttendance, generatePayslip, newEmployeeButton, calculateDeductionsButton;
     
+    // New components for filtering
+    JTextField filterDateField;
+    JLabel filterDateLabel;
+    JButton clearFilterButton;
+    
     Container container;
     GridBagLayout layout;
     
@@ -86,6 +91,12 @@ public class PayrollGui extends JFrame {
         viewAllAttendance = new JButton("View All Attendance");
         generatePayslip = new JButton("Generate Payslip");
         calculateDeductionsButton = new JButton("Calculate Pay & Deductions");
+        
+        // Initialize new filter components
+        filterDateLabel = new JLabel("Filter Date:");
+        filterDateField = new JTextField(10);
+        filterDateField.setText(LocalDate.now().format(dateFormatter));
+        clearFilterButton = new JButton("Clear Filter");
         
         tableModel = new EmployeeTableModel();
         employeeTable = new JTable(tableModel);
@@ -214,20 +225,30 @@ public class PayrollGui extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         container.add(actionPanel, gbc);
         
+        // Create a separate panel for filter controls
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        filterPanel.add(filterDateLabel);
+        filterPanel.add(filterDateField);
+        filterPanel.add(viewAttendanceByDate);
+        filterPanel.add(clearFilterButton);
+        
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        container.add(filterPanel, gbc);
+        
         JPanel buttonPanel = new JPanel(new GridLayout(2, 3, 5, 5));
         buttonPanel.add(addEmployee);
         buttonPanel.add(updateEmployee);
         buttonPanel.add(deleteEmployee);
         buttonPanel.add(generateReport);
-        buttonPanel.add(viewAttendanceByDate);
         buttonPanel.add(viewAllAttendance);
         buttonPanel.add(generatePayslip);
         
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         container.add(buttonPanel, gbc);
         
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.BOTH; gbc.weighty = 1.0;
         container.add(tableScrollPane, gbc);
         
@@ -291,20 +312,19 @@ public class PayrollGui extends JFrame {
             dateField.setText(LocalDate.now().format(dateFormatter));
         });
         
+        // Action listener for the View Attendance by Date button (modified to filter)
         viewAttendanceByDate.addActionListener(e -> {
             try {
-                String dateStr = dateField.getText();
+                String dateStr = filterDateField.getText();
                 LocalDate localDate = LocalDate.parse(dateStr, dateFormatter);
                 
-                List<Employee> employees = employeeDAO.getEmployeesForDate(localDate);
-                tableModel.clearAll();
-                for (Employee employee : employees) {
-                    tableModel.addEmployee(employee);
-                }
+                // Filter the table model instead of clearing and reloading
+                tableModel.filterByDate(localDate);
                 
+                int filteredCount = tableModel.getRowCount();
                 JOptionPane.showMessageDialog(this, 
-                    "Showing " + employees.size() + " employee attendance records for " + localDate, 
-                    "Attendance Records", JOptionPane.INFORMATION_MESSAGE);
+                    "Filtered to show " + filteredCount + " employee records for " + localDate, 
+                    "Filtered Attendance Records", JOptionPane.INFORMATION_MESSAGE);
             } catch (DateTimeParseException ex) {
                 JOptionPane.showMessageDialog(this, 
                     "Please enter a valid date in YYYY-MM-DD format.", 
@@ -312,7 +332,16 @@ public class PayrollGui extends JFrame {
             }
         });
         
+        // Action listener for the Clear Filter button
+        clearFilterButton.addActionListener(e -> {
+            tableModel.clearFilter();
+            JOptionPane.showMessageDialog(this, 
+                "Filter cleared, showing all employee records.", 
+                "Filter Cleared", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
         viewAllAttendance.addActionListener(e -> {
+            tableModel.clearFilter(); // Clear any existing filter
             loadEmployeesFromDatabase();
             JOptionPane.showMessageDialog(this, 
                 "Showing all employee records", 
@@ -547,12 +576,22 @@ public class PayrollGui extends JFrame {
         });
         
         generateReport.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Report generation functionality will be implemented in future updates.");
+            ReportGenerator reportGenerator = new ReportGenerator(employeeDAO);
+    reportGenerator.setVisible(true);
         });
         
         generatePayslip.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Payslip generation functionality will be implemented in future updates.");
-        });
+    int selectedRow = employeeTable.getSelectedRow();
+    if (selectedRow >= 0) {
+        Employee employee = tableModel.getEmployee(selectedRow);
+        PayslipGenerator payslipGenerator = new PayslipGenerator(employee, this);
+        payslipGenerator.generateAndShowPayslip();
+    } else {
+        JOptionPane.showMessageDialog(this, 
+            "Please select an employee to generate a payslip.", 
+            "No Selection", JOptionPane.WARNING_MESSAGE);
+    }
+});
         
         employeeTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
