@@ -576,7 +576,8 @@ public class PayrollGui extends JFrame {
         });
         
         generateReport.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Report generation functionality will be implemented in future updates.");
+            ReportGenerator reportGenerator = new ReportGenerator(employeeDAO);
+    reportGenerator.setVisible(true);
         });
         
         generatePayslip.addActionListener(e -> {
