@@ -12,15 +12,18 @@ public class EmployeeTableModel extends AbstractTableModel {
         "Total Deduction", "Gross Pay", "Net Pay", "Attendance"
     };
     private List<Employee> employees;
+    private List<Employee> filteredEmployees; // Added for filtering
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private LocalDate filterDate = null; // Store current filter date
     
     public EmployeeTableModel() {
         this.employees = new ArrayList<>();
+        this.filteredEmployees = new ArrayList<>();
     }
     
     @Override
     public int getRowCount() {
-        return employees.size();
+        return isFiltered() ? filteredEmployees.size() : employees.size();
     }
     
     @Override
@@ -35,7 +38,7 @@ public class EmployeeTableModel extends AbstractTableModel {
     
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
-        Employee employee = employees.get(rowIndex);
+        Employee employee = isFiltered() ? filteredEmployees.get(rowIndex) : employees.get(rowIndex);
         switch (columnIndex) {
             case 0: return employee.getId();
             case 1: return employee.getName();
@@ -57,7 +60,7 @@ public class EmployeeTableModel extends AbstractTableModel {
     
     @Override
     public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
-        Employee employee = employees.get(rowIndex);
+        Employee employee = isFiltered() ? filteredEmployees.get(rowIndex) : employees.get(rowIndex);
         try {
             switch (columnIndex) {
                 case 0: employee.setId((String) aValue); break;
@@ -152,20 +155,39 @@ public class EmployeeTableModel extends AbstractTableModel {
     
     public void addEmployee(Employee employee) {
         employees.add(employee);
-        fireTableRowsInserted(employees.size() - 1, employees.size() - 1);
+        if (!isFiltered() || (filterDate != null && employee.getDate() != null && employee.getDate().equals(filterDate))) {
+            filteredEmployees.add(employee);
+            fireTableRowsInserted(getRowCount() - 1, getRowCount() - 1);
+        } else {
+            fireTableDataChanged();
+        }
     }
     
     public void removeEmployee(int rowIndex) {
-        employees.remove(rowIndex);
+        if (isFiltered()) {
+            Employee empToRemove = filteredEmployees.get(rowIndex);
+            filteredEmployees.remove(rowIndex);
+            employees.remove(empToRemove);
+        } else {
+            employees.remove(rowIndex);
+        }
         fireTableRowsDeleted(rowIndex, rowIndex);
     }
     
     public Employee getEmployee(int rowIndex) {
-        return employees.get(rowIndex);
+        return isFiltered() ? filteredEmployees.get(rowIndex) : employees.get(rowIndex);
     }
     
     public void updateEmployee(int rowIndex, Employee employee) {
-        employees.set(rowIndex, employee);
+        if (isFiltered()) {
+            int mainIndex = employees.indexOf(filteredEmployees.get(rowIndex));
+            if (mainIndex >= 0) {
+                employees.set(mainIndex, employee);
+            }
+            filteredEmployees.set(rowIndex, employee);
+        } else {
+            employees.set(rowIndex, employee);
+        }
         fireTableRowsUpdated(rowIndex, rowIndex);
     }
     
@@ -174,12 +196,47 @@ public class EmployeeTableModel extends AbstractTableModel {
     }
     
     public void clearAll() {
-        int size = employees.size();
+        int size = isFiltered() ? filteredEmployees.size() : employees.size();
         if (size > 0) {
             employees.clear();
+            filteredEmployees.clear();
+            filterDate = null;
             fireTableRowsDeleted(0, size - 1);
         } else {
             employees.clear();
+            filteredEmployees.clear();
+            filterDate = null;
         }
+    }
+    
+    // New methods for filtering
+    public void filterByDate(LocalDate date) {
+        filterDate = date;
+        if (date == null) {
+            clearFilter();
+            return;
+        }
+        
+        filteredEmployees.clear();
+        for (Employee emp : employees) {
+            if (emp.getDate() != null && emp.getDate().equals(date)) {
+                filteredEmployees.add(emp);
+            }
+        }
+        fireTableDataChanged();
+    }
+    
+    public void clearFilter() {
+        filterDate = null;
+        filteredEmployees.clear();
+        fireTableDataChanged();
+    }
+    
+    public boolean isFiltered() {
+        return filterDate != null;
+    }
+    
+    public LocalDate getCurrentFilterDate() {
+        return filterDate;
     }
 }

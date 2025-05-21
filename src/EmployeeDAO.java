@@ -557,4 +557,70 @@ public class EmployeeDAO {
         }
         return employees;
     }
+    
+    public List<Employee> getEmployeesForDateRange(LocalDate startDate, LocalDate endDate) {
+        // Get payroll records for all employees for a date range
+        List<Employee> employees = new ArrayList<>();
+        String sql = "SELECT e.id, e.name, p.total_hours, p.overtime, p.wage, p.date, " +
+                     "p.sss_deduction, p.philhealth_deduction, p.pagibig_deduction, p.tax_deductions, " +
+                     "a.status " +
+                     "FROM employees e " +
+                     "LEFT JOIN payroll p ON e.id = p.employee_id AND p.date BETWEEN ? AND ? " +
+                     "LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = p.date " +
+                     "WHERE p.date IS NOT NULL " +
+                     "ORDER BY p.date, e.id";
+                     
+        try (Connection conn = dbConfig.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setDate(1, java.sql.Date.valueOf(startDate));
+            pstmt.setDate(2, java.sql.Date.valueOf(endDate));
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Employee employee = new Employee();
+                    employee.setId(rs.getString("id"));
+                    employee.setName(rs.getString("name"));
+                    
+                    // Handle null values from LEFT JOIN
+                    double totalHours = rs.getDouble("total_hours");
+                    employee.setTotalHours(rs.wasNull() ? 0 : totalHours);
+                    
+                    double overtime = rs.getDouble("overtime");
+                    employee.setOvertime(rs.wasNull() ? 0 : overtime);
+                    
+                    double wage = rs.getDouble("wage");
+                    employee.setWage(rs.wasNull() ? 0 : wage);
+                    
+                    Date date = rs.getDate("date");
+                    if (date != null) {
+                        employee.setDate(date.toLocalDate());
+                    } else {
+                        employee.setDate(LocalDate.now());
+                    }
+                    
+                    // Get all deduction values with null checks
+                    double sssDeduction = rs.getDouble("sss_deduction");
+                    employee.setSssDeduction(rs.wasNull() ? 0 : sssDeduction);
+                    
+                    double philhealthDeduction = rs.getDouble("philhealth_deduction");
+                    employee.setPhilhealthDeduction(rs.wasNull() ? 0 : philhealthDeduction);
+                    
+                    double pagibigDeduction = rs.getDouble("pagibig_deduction");
+                    employee.setPagibigDeduction(rs.wasNull() ? 0 : pagibigDeduction);
+                    
+                    double taxDeduction = rs.getDouble("tax_deductions");
+                    employee.setTaxDeduction(rs.wasNull() ? 0 : taxDeduction);
+                    
+                    String status = rs.getString("status");
+                    employee.setAttendance(status != null ? status : "Present");
+                    
+                    employees.add(employee);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting employees for date range: " + e.getMessage());
+        }
+        return employees;
+    }
 }
