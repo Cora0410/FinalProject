@@ -6,25 +6,24 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public class PayrollGui extends JFrame {
-
-    // Employee information fields
     JLabel employeeName, employeeId, hourlyRateLabel, maxHoursLabel, hoursWorkedLabel, dateLabel;
     JTextField employeeNameField, employeeIdField, hourlyRateField, maxHoursField, hoursWorkedField, dateField;
     
-    // Deduction fields
     JLabel sssLabel, philhealthLabel, pagibigLabel, taxLabel;
     JTextField sssField, philhealthField, pagibigField, taxField;
     
-    // Calculation fields
     JLabel totalDeductionLabel, grossPayLabel, netPayLabel;
     JTextField totalDeductionField, grossPayField, netPayField;
     
     JToggleButton allowOvertimeToggle;
     
-    // Buttons
     JButton addEmployee, updateEmployee, deleteEmployee, generateReport;
-    JButton viewAttendance, generatePayslip, newEmployeeButton, calculateDeductionsButton;
-    JButton viewByDateButton;
+    JButton viewAttendanceByDate, viewAllAttendance, generatePayslip, newEmployeeButton, calculateDeductionsButton;
+    
+    // New components for filtering
+    JTextField filterDateField;
+    JLabel filterDateLabel;
+    JButton clearFilterButton;
     
     Container container;
     GridBagLayout layout;
@@ -33,16 +32,13 @@ public class PayrollGui extends JFrame {
     EmployeeTableModel tableModel;
     EmployeeDAO employeeDAO;
     
-    // Date formatter
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     
     public PayrollGui() {
         setTitle("Philippine Payroll Management System");
         
-        // Initialize DAO with database connection
         employeeDAO = new EmployeeDAO();
         
-        // Initialize basic UI components
         employeeName = new JLabel("Employee Name:");
         employeeId = new JLabel("Employee ID:");
         hourlyRateLabel = new JLabel("Hourly Rate (PHP):");
@@ -57,10 +53,8 @@ public class PayrollGui extends JFrame {
         hoursWorkedField = new JTextField(20);
         dateField = new JTextField(20);
         
-        // Set today's date as default
         dateField.setText(LocalDate.now().format(dateFormatter));
         
-        // Initialize deduction fields
         sssLabel = new JLabel("SSS Deduction:");
         philhealthLabel = new JLabel("PhilHealth Deduction:");
         pagibigLabel = new JLabel("Pag-IBIG Deduction:");
@@ -71,7 +65,6 @@ public class PayrollGui extends JFrame {
         pagibigField = new JTextField(20);
         taxField = new JTextField(20);
         
-        // Initialize calculation fields
         totalDeductionLabel = new JLabel("Total Deduction:");
         grossPayLabel = new JLabel("Gross Pay:");
         netPayLabel = new JLabel("Net Pay:");
@@ -80,48 +73,45 @@ public class PayrollGui extends JFrame {
         grossPayField = new JTextField(20);
         netPayField = new JTextField(20);
         
-        // Make calculation fields read-only
         totalDeductionField.setEditable(false);
         grossPayField.setEditable(false);
         netPayField.setEditable(false);
         
-        // Default values
-        maxHoursField.setText("40"); // Default max hours (standard work week)
+        maxHoursField.setText("40");
         
-        // Overtime toggle
         allowOvertimeToggle = new JToggleButton("Allow Overtime");
-        allowOvertimeToggle.setSelected(false); // Default: no overtime
+        allowOvertimeToggle.setSelected(false);
         
-        // Buttons
         newEmployeeButton = new JButton("New Employee");
         addEmployee = new JButton("Add Employee");
         updateEmployee = new JButton("Update Employee");
         deleteEmployee = new JButton("Delete Employee");
         generateReport = new JButton("Generate Reports");
-        viewAttendance = new JButton("View Attendance");
+        viewAttendanceByDate = new JButton("View Attendance by Date");
+        viewAllAttendance = new JButton("View All Attendance");
         generatePayslip = new JButton("Generate Payslip");
         calculateDeductionsButton = new JButton("Calculate Pay & Deductions");
-        viewByDateButton = new JButton("View Records by Date");
         
-        // Table
+        // Initialize new filter components
+        filterDateLabel = new JLabel("Filter Date:");
+        filterDateField = new JTextField(10);
+        filterDateField.setText(LocalDate.now().format(dateFormatter));
+        clearFilterButton = new JButton("Clear Filter");
+        
         tableModel = new EmployeeTableModel();
         employeeTable = new JTable(tableModel);
         JScrollPane tableScrollPane = new JScrollPane(employeeTable);
         
-        // Layout
         container = this.getContentPane();
         layout = new GridBagLayout();
         container.setLayout(layout);
         
-        // Create employee info panel
         JPanel employeeInfoPanel = new JPanel(new GridBagLayout());
         employeeInfoPanel.setBorder(BorderFactory.createTitledBorder("Employee Information"));
         
-        // Create deduction panel
         JPanel deductionPanel = new JPanel(new GridBagLayout());
         deductionPanel.setBorder(BorderFactory.createTitledBorder("Deductions"));
         
-        // Add components to employee info panel
         GridBagConstraints gbcInfo = new GridBagConstraints();
         gbcInfo.insets = new Insets(3, 3, 3, 3);
         gbcInfo.anchor = GridBagConstraints.WEST;
@@ -167,7 +157,6 @@ public class PayrollGui extends JFrame {
         gbcInfo.fill = GridBagConstraints.NONE; gbcInfo.anchor = GridBagConstraints.CENTER;
         employeeInfoPanel.add(allowOvertimeToggle, gbcInfo);
         
-        // Add components to deduction panel
         GridBagConstraints gbcDeduct = new GridBagConstraints();
         gbcDeduct.insets = new Insets(3, 3, 3, 3);
         gbcDeduct.anchor = GridBagConstraints.WEST;
@@ -197,7 +186,6 @@ public class PayrollGui extends JFrame {
         gbcDeduct.gridx = 1; gbcDeduct.weightx = 1.0;
         deductionPanel.add(taxField, gbcDeduct);
         
-        // Add total calculation fields to deduction panel
         gbcDeduct.gridx = 0; gbcDeduct.gridy = 4; gbcDeduct.weightx = 0.0;
         deductionPanel.add(totalDeductionLabel, gbcDeduct);
         
@@ -220,7 +208,6 @@ public class PayrollGui extends JFrame {
         gbcDeduct.fill = GridBagConstraints.NONE; gbcDeduct.anchor = GridBagConstraints.CENTER;
         deductionPanel.add(calculateDeductionsButton, gbcDeduct);
         
-        // Add panels to main container
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.BOTH;
@@ -231,62 +218,61 @@ public class PayrollGui extends JFrame {
         gbc.gridx = 1;
         container.add(deductionPanel, gbc);
         
-        // Add action buttons
-        JPanel actionPanel = new JPanel(new GridLayout(1, 2, 5, 5));
+        JPanel actionPanel = new JPanel(new GridLayout(1, 1, 5, 5));
         actionPanel.add(newEmployeeButton);
-        actionPanel.add(viewByDateButton);
         
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         container.add(actionPanel, gbc);
         
-        // Add button panel - removed Calculate Overtime and Process Payroll buttons
+        // Create a separate panel for filter controls
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        filterPanel.add(filterDateLabel);
+        filterPanel.add(filterDateField);
+        filterPanel.add(viewAttendanceByDate);
+        filterPanel.add(clearFilterButton);
+        
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        container.add(filterPanel, gbc);
+        
         JPanel buttonPanel = new JPanel(new GridLayout(2, 3, 5, 5));
         buttonPanel.add(addEmployee);
         buttonPanel.add(updateEmployee);
         buttonPanel.add(deleteEmployee);
         buttonPanel.add(generateReport);
-        buttonPanel.add(viewAttendance);
+        buttonPanel.add(viewAllAttendance);
         buttonPanel.add(generatePayslip);
         
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         container.add(buttonPanel, gbc);
         
-        // Add table
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.BOTH; gbc.weighty = 1.0;
         container.add(tableScrollPane, gbc);
         
-        // Calculate Deductions button action
         calculateDeductionsButton.addActionListener(e -> {
             try {
-                // Get input values
                 double hourlyRate = Double.parseDouble(hourlyRateField.getText());
                 double maxHours = Double.parseDouble(maxHoursField.getText());
                 double hoursWorked = Double.parseDouble(hoursWorkedField.getText());
                 
-                // Calculate actual hours and overtime
                 double hoursForPayment;
                 double overtimeHours = 0;
                 
                 if (allowOvertimeToggle.isSelected()) {
-                    // Overtime allowed - pay for all hours
                     hoursForPayment = hoursWorked;
-                    // Calculate overtime hours
                     if (hoursWorked > maxHours) {
                         overtimeHours = hoursWorked - maxHours;
                     }
                 } else {
-                    // Overtime not allowed - cap at maximum hours
                     hoursForPayment = Math.min(hoursWorked, maxHours);
                 }
                 
-                // Calculate gross pay
                 double wage = hourlyRate * hoursForPayment;
                 grossPayField.setText(String.format("%.2f", wage));
                 
-                // Get deduction inputs
                 double sss = 0;
                 double philhealth = 0;
                 double pagibig = 0;
@@ -305,11 +291,9 @@ public class PayrollGui extends JFrame {
                     tax = Double.parseDouble(taxField.getText());
                 }
                 
-                // Calculate total deduction
                 double totalDeduction = sss + philhealth + pagibig + tax;
                 totalDeductionField.setText(String.format("%.2f", totalDeduction));
                 
-                // Calculate net pay
                 double netPay = wage - totalDeduction;
                 netPayField.setText(String.format("%.2f", netPay));
                 
@@ -320,41 +304,48 @@ public class PayrollGui extends JFrame {
             }
         });
         
-        // New button action listener
         newEmployeeButton.addActionListener(e -> {
-            // Clear table selection
             employeeTable.clearSelection();
-            
-            // Clear all input fields
             clearFields();
-            
-            // Reset defaults
             maxHoursField.setText("40");
             allowOvertimeToggle.setSelected(false);
-            dateField.setText(LocalDate.now().format(dateFormatter)); // Reset to today
+            dateField.setText(LocalDate.now().format(dateFormatter));
         });
         
-        // View by date button
-        viewByDateButton.addActionListener(e -> {
+        // Action listener for the View Attendance by Date button (modified to filter)
+        viewAttendanceByDate.addActionListener(e -> {
             try {
-                String dateStr = dateField.getText();
+                String dateStr = filterDateField.getText();
                 LocalDate localDate = LocalDate.parse(dateStr, dateFormatter);
                 
-                // Load employees for the selected date
-                tableModel.clearAll();
-                List<Employee> employees = employeeDAO.getEmployeesForDate(localDate);
-                for (Employee employee : employees) {
-                    tableModel.addEmployee(employee);
-                }
+                // Filter the table model instead of clearing and reloading
+                tableModel.filterByDate(localDate);
                 
+                int filteredCount = tableModel.getRowCount();
                 JOptionPane.showMessageDialog(this, 
-                    "Loaded " + employees.size() + " employee records for " + localDate, 
-                    "Records Loaded", JOptionPane.INFORMATION_MESSAGE);
+                    "Filtered to show " + filteredCount + " employee records for " + localDate, 
+                    "Filtered Attendance Records", JOptionPane.INFORMATION_MESSAGE);
             } catch (DateTimeParseException ex) {
                 JOptionPane.showMessageDialog(this, 
                     "Please enter a valid date in YYYY-MM-DD format.", 
                     "Invalid Date Format", JOptionPane.WARNING_MESSAGE);
             }
+        });
+        
+        // Action listener for the Clear Filter button
+        clearFilterButton.addActionListener(e -> {
+            tableModel.clearFilter();
+            JOptionPane.showMessageDialog(this, 
+                "Filter cleared, showing all employee records.", 
+                "Filter Cleared", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
+        viewAllAttendance.addActionListener(e -> {
+            tableModel.clearFilter(); // Clear any existing filter
+            loadEmployeesFromDatabase();
+            JOptionPane.showMessageDialog(this, 
+                "Showing all employee records", 
+                "All Records", JOptionPane.INFORMATION_MESSAGE);
         });
         
         addEmployee.addActionListener(e -> {
@@ -368,6 +359,15 @@ public class PayrollGui extends JFrame {
             try {
                 LocalDate localDate = LocalDate.parse(dateText, dateFormatter);
                 
+                // Check if employee with same ID already exists for this date
+                Employee existingEmployee = employeeDAO.getEmployeeForDate(id, localDate);
+                if (existingEmployee != null) {
+                    JOptionPane.showMessageDialog(this, 
+                        "An employee with ID '" + id + "' already exists for date " + localDate, 
+                        "Duplicate Entry", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                
                 if (!name.isEmpty() && !id.isEmpty() && !hourlyRateText.isEmpty() 
                     && !maxHoursText.isEmpty() && !hoursWorkedText.isEmpty()) {
                     try {
@@ -375,26 +375,20 @@ public class PayrollGui extends JFrame {
                         double maxHours = Double.parseDouble(maxHoursField.getText());
                         double hoursWorked = Double.parseDouble(hoursWorkedField.getText());
                         
-                        // Calculate actual hours to pay based on overtime setting
                         double hoursForPayment;
                         double overtimeHours = 0;
                         
                         if (allowOvertimeToggle.isSelected()) {
-                            // Overtime allowed - pay for all hours
                             hoursForPayment = hoursWorked;
-                            // Calculate overtime hours (hours beyond the maximum)
                             if (hoursWorked > maxHours) {
                                 overtimeHours = hoursWorked - maxHours;
                             }
                         } else {
-                            // Overtime not allowed - cap at maximum hours
                             hoursForPayment = Math.min(hoursWorked, maxHours);
                         }
                         
-                        // Calculate wage: hourly rate × hours for payment
                         double wage = rate * hoursForPayment;
                         
-                        // Get deduction values
                         double sss = 0;
                         double philhealth = 0;
                         double pagibig = 0;
@@ -416,7 +410,6 @@ public class PayrollGui extends JFrame {
                         Employee employee = new Employee(id, name, hoursForPayment, overtimeHours, 
                                                wage, localDate, sss, philhealth, pagibig, tax, "Present");
                         
-                        // Save to database and update table model
                         if (employeeDAO.addEmployee(employee)) {
                             tableModel.addEmployee(employee);
                             JOptionPane.showMessageDialog(this, "Employee record added successfully!");
@@ -451,6 +444,18 @@ public class PayrollGui extends JFrame {
                 
                 try {
                     LocalDate localDate = LocalDate.parse(dateText, dateFormatter);
+                    Employee currentEmployee = tableModel.getEmployee(selectedRow);
+                    
+                    // Check if changing to a different ID/date that already exists
+                    if (!id.equals(currentEmployee.getId()) || !localDate.equals(currentEmployee.getDate())) {
+                        Employee existingEmployee = employeeDAO.getEmployeeForDate(id, localDate);
+                        if (existingEmployee != null) {
+                            JOptionPane.showMessageDialog(this, 
+                                "An employee with ID '" + id + "' already exists for date " + localDate, 
+                                "Duplicate Entry", JOptionPane.WARNING_MESSAGE);
+                            return;
+                        }
+                    }
                     
                     if (!name.isEmpty() && !id.isEmpty() && !hourlyRateText.isEmpty() 
                         && !maxHoursText.isEmpty() && !hoursWorkedText.isEmpty()) {
@@ -459,26 +464,20 @@ public class PayrollGui extends JFrame {
                             double maxHours = Double.parseDouble(maxHoursText);
                             double hoursWorked = Double.parseDouble(hoursWorkedText);
                             
-                            // Calculate actual hours to pay based on overtime setting
                             double hoursForPayment;
                             double overtimeHours = 0;
                             
                             if (allowOvertimeToggle.isSelected()) {
-                                // Overtime allowed - pay for all hours
                                 hoursForPayment = hoursWorked;
-                                // Calculate overtime hours (hours beyond the maximum)
                                 if (hoursWorked > maxHours) {
                                     overtimeHours = hoursWorked - maxHours;
                                 }
                             } else {
-                                // Overtime not allowed - cap at maximum hours
                                 hoursForPayment = Math.min(hoursWorked, maxHours);
                             }
                             
-                            // Calculate wage: hourly rate × hours for payment
                             double wage = rate * hoursForPayment;
                             
-                            // Get deduction values
                             double sss = 0;
                             double philhealth = 0;
                             double pagibig = 0;
@@ -509,7 +508,6 @@ public class PayrollGui extends JFrame {
                             employee.setPagibigDeduction(pagibig);
                             employee.setTaxDeduction(tax);
                             
-                            // Update database and table model
                             if (employeeDAO.updateEmployee(employee)) {
                                 tableModel.updateEmployee(selectedRow, employee);
                                 JOptionPane.showMessageDialog(this, "Employee updated successfully!");
@@ -541,7 +539,6 @@ public class PayrollGui extends JFrame {
             if (selectedRow >= 0) {
                 Employee employee = tableModel.getEmployee(selectedRow);
                 
-                // Ask if user wants to delete the entire employee or just this date's record
                 String[] options = {"Delete All Records", "Delete Only This Date", "Cancel"};
                 int choice = JOptionPane.showOptionDialog(this,
                     "Do you want to delete all records for this employee or only this date's record?",
@@ -553,7 +550,6 @@ public class PayrollGui extends JFrame {
                     options[2]);
                 
                 if (choice == 0) {
-                    // Delete all employee records
                     if (employeeDAO.deleteEmployee(employee.getId())) {
                         tableModel.removeEmployee(selectedRow);
                         JOptionPane.showMessageDialog(this, "Employee deleted successfully!");
@@ -564,7 +560,6 @@ public class PayrollGui extends JFrame {
                                                "Database Error", JOptionPane.ERROR_MESSAGE);
                     }
                 } else if (choice == 1) {
-                    // Delete only this date's record
                     if (employeeDAO.deleteEmployeeRecord(employee.getId(), employee.getDate())) {
                         tableModel.removeEmployee(selectedRow);
                         JOptionPane.showMessageDialog(this, "Employee record for this date deleted successfully!");
@@ -584,10 +579,6 @@ public class PayrollGui extends JFrame {
             JOptionPane.showMessageDialog(this, "Report generation functionality will be implemented in future updates.");
         });
         
-        viewAttendance.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Attendance viewing functionality will be implemented in future updates.");
-        });
-        
         generatePayslip.addActionListener(e -> {
             JOptionPane.showMessageDialog(this, "Payslip generation functionality will be implemented in future updates.");
         });
@@ -604,39 +595,31 @@ public class PayrollGui extends JFrame {
                     double overtime = employee.getOvertime();
                     double wage = employee.getWage();
                     
-                    // Calculate hourly rate from wage and total hours
                     double hourlyRate = 0;
                     if (totalHours > 0) {
                         hourlyRate = wage / totalHours;
                     }
                     
                     hourlyRateField.setText(String.format("%.2f", hourlyRate));
-                    
-                    // Set hours worked as the sum of regular hours and overtime
                     hoursWorkedField.setText(String.format("%.2f", totalHours + overtime));
                     
-                    // Set the date field
                     if (employee.getDate() != null) {
                         dateField.setText(employee.getDate().format(dateFormatter));
                     } else {
                         dateField.setText(LocalDate.now().format(dateFormatter));
                     }
                     
-                    // Keep the current max hours value
                     if (maxHoursField.getText().isEmpty()) {
-                        maxHoursField.setText("40"); // Default if not set
+                        maxHoursField.setText("40");
                     }
                     
-                    // Set overtime toggle based on whether there's overtime
                     allowOvertimeToggle.setSelected(overtime > 0);
                     
-                    // Populate deduction fields
                     sssField.setText(String.format("%.2f", employee.getSssDeduction()));
                     philhealthField.setText(String.format("%.2f", employee.getPhilhealthDeduction()));
                     pagibigField.setText(String.format("%.2f", employee.getPagibigDeduction()));
                     taxField.setText(String.format("%.2f", employee.getTaxDeduction()));
                     
-                    // Update calculated fields
                     totalDeductionField.setText(String.format("%.2f", employee.getTotalDeduction()));
                     grossPayField.setText(String.format("%.2f", employee.getGrossPay()));
                     netPayField.setText(String.format("%.2f", employee.getNetPay()));
@@ -644,10 +627,9 @@ public class PayrollGui extends JFrame {
             }
         });
         
-        setSize(950, 800); // Increased size to accommodate new fields
+        setSize(950, 800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
-        // Load employees from database on startup
         loadEmployeesFromDatabase();
         
         setVisible(true);
@@ -655,7 +637,6 @@ public class PayrollGui extends JFrame {
         employeeTable.setRowSelectionAllowed(true);
         employeeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         
-        // Test database connection
         if (DatabaseConfig.getInstance().testConnection()) {
             setTitle("Philippine Payroll Management System - Connected to Database");
         } else {
@@ -675,14 +656,11 @@ public class PayrollGui extends JFrame {
         totalDeductionField.setText("");
         grossPayField.setText("");
         netPayField.setText("");
-        // Keep date as is
     }
     
     private void loadEmployeesFromDatabase() {
-        // Clear existing data
         tableModel.clearAll();
         
-        // Load employees from database - most recent records
         List<Employee> employees = employeeDAO.getEmployeesWithPayroll();
         for (Employee employee : employees) {
             tableModel.addEmployee(employee);
