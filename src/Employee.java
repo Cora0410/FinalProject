@@ -16,11 +16,16 @@ public class Employee {
     private double netPay;
     private String attendance;
     
-    // Philippine deduction rates
-    public static final double SSS_EMPLOYEE_RATE = 0.05;  // 5%
-    public static final double PHILHEALTH_EMPLOYEE_RATE = 0.025;  // 2.5%
-    public static final double PAGIBIG_EMPLOYEE_RATE = 0.02;  // 2%
-    public static final double PAGIBIG_CAP = 10000.0;  // Monthly compensation cap for Pag-IBIG
+    // Philippine deduction rates for 2025
+    public static final double SSS_EMPLOYEE_RATE = 0.05;  // 5% (employee share only)
+    public static final double SSS_MIN_MSC = 5000.0;      // Minimum Monthly Salary Credit
+    public static final double SSS_MAX_MSC = 35000.0;     // Maximum Monthly Salary Credit
+    
+    public static final double PHILHEALTH_EMPLOYEE_RATE = 0.025;  // 2.5% (employee share only)
+    public static final double PHILHEALTH_CAP = 100000.0;         // Monthly compensation cap
+    
+    public static final double PAGIBIG_EMPLOYEE_RATE = 0.02;  // 2% (employee share only)
+    public static final double PAGIBIG_CAP = 10000.0;        // Monthly compensation cap (updated 2024)
     
     public static class DeductionCalculation {
         public double sssDeduction;
@@ -70,15 +75,15 @@ public class Employee {
             return new DeductionCalculation(0, 0, 0, 0);
         }
         
-        // SSS Deduction (5% of wage, with MSC range ₱4,250 to ₱29,750)
-        double sssBase = Math.max(4250, Math.min(monthlyWage, 29750));
+        // SSS Deduction (5% employee share of MSC, range ₱5,000 to ₱35,000)
+        double sssBase = Math.max(SSS_MIN_MSC, Math.min(monthlyWage, SSS_MAX_MSC));
         double sssDeduction = sssBase * SSS_EMPLOYEE_RATE;
         
-        // PhilHealth Deduction (2.5% of wage, cap at ₱100,000)
-        double philhealthBase = Math.min(monthlyWage, 100000);
+        // PhilHealth Deduction (2.5% employee share, cap at ₱100,000)
+        double philhealthBase = Math.min(monthlyWage, PHILHEALTH_CAP);
         double philhealthDeduction = philhealthBase * PHILHEALTH_EMPLOYEE_RATE;
         
-        // Pag-IBIG Deduction (2% of wage, cap at ₱10,000)
+        // Pag-IBIG Deduction (2% employee share, cap at ₱10,000)
         double pagibigBase = Math.min(monthlyWage, PAGIBIG_CAP);
         double pagibigDeduction = pagibigBase * PAGIBIG_EMPLOYEE_RATE;
         

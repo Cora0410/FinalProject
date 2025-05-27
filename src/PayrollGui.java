@@ -20,11 +20,17 @@ public class PayrollGui extends JFrame {
     
     JButton addEmployee, updateEmployee, deleteEmployee, generateReport;
     JButton viewAttendanceByDate, viewAllAttendance, generatePayslip, newEmployeeButton, calculateDeductionsButton;
+    JButton viewAttendanceByEmployee;
     
-    // New components for filtering
+    // Filter and search components
     JTextField filterDateField;
     JLabel filterDateLabel;
     JButton clearFilterButton;
+    
+    // NEW: Search components
+    JTextField searchEmployeeIdField;
+    JLabel searchEmployeeIdLabel;
+    JButton searchButton, clearSearchButton;
     
     Container container;
     GridBagLayout layout;
@@ -112,14 +118,21 @@ public class PayrollGui extends JFrame {
         generateReport = new JButton("Generate Reports");
         viewAttendanceByDate = new JButton("View Attendance by Date");
         viewAllAttendance = new JButton("View All Attendance");
+        viewAttendanceByEmployee = new JButton("View Attendance by Employee");
         generatePayslip = new JButton("Generate Payslip");
         calculateDeductionsButton = new JButton("Calculate Pay & Deductions");
         
-        // Initialize new filter components
+        // Initialize filter components
         filterDateLabel = new JLabel("Filter Date:");
         filterDateField = new JTextField(10);
         filterDateField.setText(LocalDate.now().format(dateFormatter));
         clearFilterButton = new JButton("Clear Filter");
+        
+        // NEW: Initialize search components
+        searchEmployeeIdLabel = new JLabel("Search Employee ID:");
+        searchEmployeeIdField = new JTextField(10);
+        searchButton = new JButton("Search");
+        clearSearchButton = new JButton("Clear Search");
         
         tableModel = new EmployeeTableModel();
         employeeTable = new JTable(tableModel);
@@ -133,7 +146,7 @@ public class PayrollGui extends JFrame {
         employeeInfoPanel.setBorder(BorderFactory.createTitledBorder("Employee Information"));
         
         JPanel deductionPanel = new JPanel(new GridBagLayout());
-        deductionPanel.setBorder(BorderFactory.createTitledBorder("Deductions (Auto-calculated)"));
+        deductionPanel.setBorder(BorderFactory.createTitledBorder("Deductions (Auto-calculated per 2025 Rates)"));
         
         GridBagConstraints gbcInfo = new GridBagConstraints();
         gbcInfo.insets = new Insets(3, 3, 3, 3);
@@ -254,24 +267,55 @@ public class PayrollGui extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         container.add(actionPanel, gbc);
         
-        // Create a separate panel for filter controls
-        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
-        filterPanel.add(filterDateLabel);
-        filterPanel.add(filterDateField);
-        filterPanel.add(viewAttendanceByDate);
-        filterPanel.add(clearFilterButton);
+        // Create filter and search panel with both date filter and employee ID search
+        JPanel filterSearchPanel = new JPanel(new GridBagLayout());
+        filterSearchPanel.setBorder(BorderFactory.createTitledBorder("Filter & Search"));
+        
+        GridBagConstraints gbcFilter = new GridBagConstraints();
+        gbcFilter.insets = new Insets(3, 3, 3, 3);
+        gbcFilter.anchor = GridBagConstraints.WEST;
+        
+        // First row - Date filter
+        gbcFilter.gridx = 0; gbcFilter.gridy = 0;
+        filterSearchPanel.add(filterDateLabel, gbcFilter);
+        
+        gbcFilter.gridx = 1;
+        filterSearchPanel.add(filterDateField, gbcFilter);
+        
+        gbcFilter.gridx = 2;
+        filterSearchPanel.add(viewAttendanceByDate, gbcFilter);
+        
+        gbcFilter.gridx = 3;
+        filterSearchPanel.add(clearFilterButton, gbcFilter);
+        
+        // Second row - Employee ID search
+        gbcFilter.gridx = 0; gbcFilter.gridy = 1;
+        filterSearchPanel.add(searchEmployeeIdLabel, gbcFilter);
+        
+        gbcFilter.gridx = 1;
+        filterSearchPanel.add(searchEmployeeIdField, gbcFilter);
+        
+        gbcFilter.gridx = 2;
+        filterSearchPanel.add(searchButton, gbcFilter);
+        
+        gbcFilter.gridx = 3;
+        filterSearchPanel.add(clearSearchButton, gbcFilter);
         
         gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        container.add(filterPanel, gbc);
+        container.add(filterSearchPanel, gbc);
         
-        JPanel buttonPanel = new JPanel(new GridLayout(2, 3, 5, 5));
+        // Button panel (3x3 grid)
+        JPanel buttonPanel = new JPanel(new GridLayout(3, 3, 5, 5));
         buttonPanel.add(addEmployee);
         buttonPanel.add(updateEmployee);
         buttonPanel.add(deleteEmployee);
         buttonPanel.add(generateReport);
         buttonPanel.add(viewAllAttendance);
+        buttonPanel.add(viewAttendanceByEmployee);
         buttonPanel.add(generatePayslip);
+        buttonPanel.add(new JLabel("")); // Empty cell
+        buttonPanel.add(new JLabel("")); // Empty cell
         
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -327,7 +371,7 @@ public class PayrollGui extends JFrame {
                 
                 grossPayField.setText(String.format("%.2f", wage));
                 
-                // Calculate percentage-based deductions
+                // Calculate percentage-based deductions using 2025 rates
                 Employee.DeductionCalculation calc = Employee.calculateDeductions(wage);
                 
                 sssField.setText(String.format("%.2f", calc.sssDeduction));
@@ -385,12 +429,52 @@ public class PayrollGui extends JFrame {
                 "Filter Cleared", JOptionPane.INFORMATION_MESSAGE);
         });
         
+        // NEW: Action listener for the Search button
+        searchButton.addActionListener(e -> {
+            String searchId = searchEmployeeIdField.getText().trim();
+            if (searchId.isEmpty()) {
+                JOptionPane.showMessageDialog(this, 
+                    "Please enter an Employee ID to search.", 
+                    "Empty Search", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            
+            // Filter the table model by employee ID
+            tableModel.filterByEmployeeId(searchId);
+            
+            int filteredCount = tableModel.getRowCount();
+            if (filteredCount == 0) {
+                JOptionPane.showMessageDialog(this, 
+                    "No records found for Employee ID: " + searchId, 
+                    "No Results", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Found " + filteredCount + " records for Employee ID: " + searchId, 
+                    "Search Results", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+        
+        // NEW: Action listener for the Clear Search button
+        clearSearchButton.addActionListener(e -> {
+            searchEmployeeIdField.setText("");
+            tableModel.clearFilter();
+            JOptionPane.showMessageDialog(this, 
+                "Search cleared, showing all employee records.", 
+                "Search Cleared", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
         viewAllAttendance.addActionListener(e -> {
             tableModel.clearFilter(); // Clear any existing filter
+            searchEmployeeIdField.setText(""); // Clear search field
             loadEmployeesFromDatabase();
             JOptionPane.showMessageDialog(this, 
                 "Showing all employee records", 
                 "All Records", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
+        // Action listener for View Attendance by Employee button
+        viewAttendanceByEmployee.addActionListener(e -> {
+            showEmployeeAttendanceDialog();
         });
         
         addEmployee.addActionListener(e -> {
@@ -460,7 +544,7 @@ public class PayrollGui extends JFrame {
                             wage = rate * hoursForPayment;
                         }
                         
-                        // Calculate percentage-based deductions
+                        // Calculate percentage-based deductions using 2025 rates
                         Employee.DeductionCalculation calc = Employee.calculateDeductions(wage);
                         
                         Employee employee = new Employee(id, name, hoursForPayment, overtimeHours, 
@@ -562,7 +646,7 @@ public class PayrollGui extends JFrame {
                                 wage = rate * hoursForPayment;
                             }
                             
-                            // Calculate percentage-based deductions
+                            // Calculate percentage-based deductions using 2025 rates
                             Employee.DeductionCalculation calc = Employee.calculateDeductions(wage);
                             
                             Employee employee = tableModel.getEmployee(selectedRow);
@@ -710,7 +794,7 @@ public class PayrollGui extends JFrame {
             }
         });
         
-        setSize(950, 800);
+        setSize(950, 850); // Increased height to accommodate new filter panel
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
         loadEmployeesFromDatabase();
@@ -721,9 +805,214 @@ public class PayrollGui extends JFrame {
         employeeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         
         if (DatabaseConfig.getInstance().testConnection()) {
-            setTitle("Philippine Payroll Management System - Connected to Database");
+            setTitle("Philippine Payroll Management System - Connected to Database (2025 Rates)");
         } else {
             setTitle("Philippine Payroll Management System - Database Connection Failed");
+        }
+    }
+    
+    // Show Employee Attendance Dialog method (same as before)
+    private void showEmployeeAttendanceDialog() {
+        // Get all unique employees
+        List<Employee> allEmployees = employeeDAO.getAllEmployees();
+        if (allEmployees.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "No employees found in the database.", 
+                "No Data", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        
+        // Create employee selection dialog
+        String[] employeeOptions = allEmployees.stream()
+                .map(emp -> emp.getId() + " - " + emp.getName())
+                .toArray(String[]::new);
+        
+        String selectedEmployee = (String) JOptionPane.showInputDialog(
+            this,
+            "Select an employee to view attendance records:",
+            "Select Employee",
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            employeeOptions,
+            employeeOptions[0]
+        );
+        
+        if (selectedEmployee == null) {
+            return; // User cancelled
+        }
+        
+        // Extract employee ID from selection
+        String employeeId = selectedEmployee.split(" - ")[0];
+        String employeeName = selectedEmployee.split(" - ")[1];
+        
+        // Get all records for this employee
+        List<Employee> employeeRecords = employeeDAO.getAllRecordsForEmployee(employeeId);
+        
+        if (employeeRecords.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "No attendance records found for " + employeeName, 
+                "No Records", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        
+        // Create and show attendance window
+        showEmployeeAttendanceWindow(employeeId, employeeName, employeeRecords);
+    }
+    
+    // Show Employee Attendance Window method (same as before)
+    private void showEmployeeAttendanceWindow(String employeeId, String employeeName, List<Employee> records) {
+        JFrame attendanceFrame = new JFrame("Attendance Records - " + employeeName + " (" + employeeId + ")");
+        attendanceFrame.setSize(1000, 600);
+        attendanceFrame.setLocationRelativeTo(this);
+        
+        // Create table model for attendance records
+        String[] columnNames = {
+            "Date", "Attendance", "Hours Worked", "Overtime", "Gross Pay", 
+            "SSS", "PhilHealth", "Pag-IBIG", "Tax", "Net Pay"
+        };
+        
+        Object[][] data = new Object[records.size()][columnNames.length];
+        
+        double totalHours = 0;
+        double totalOvertime = 0;
+        double totalGrossPay = 0;
+        double totalNetPay = 0;
+        int presentDays = 0;
+        int leaveDays = 0;
+        int absentDays = 0;
+        
+        for (int i = 0; i < records.size(); i++) {
+            Employee emp = records.get(i);
+            data[i][0] = emp.getDate().format(dateFormatter);
+            data[i][1] = emp.getAttendance();
+            data[i][2] = String.format("%.2f", emp.getTotalHours());
+            data[i][3] = String.format("%.2f", emp.getOvertime());
+            data[i][4] = String.format("₱%.2f", emp.getGrossPay());
+            data[i][5] = String.format("₱%.2f", emp.getSssDeduction());
+            data[i][6] = String.format("₱%.2f", emp.getPhilhealthDeduction());
+            data[i][7] = String.format("₱%.2f", emp.getPagibigDeduction());
+            data[i][8] = String.format("₱%.2f", emp.getTaxDeduction());
+            data[i][9] = String.format("₱%.2f", emp.getNetPay());
+            
+            // Calculate totals
+            totalHours += emp.getTotalHours();
+            totalOvertime += emp.getOvertime();
+            totalGrossPay += emp.getGrossPay();
+            totalNetPay += emp.getNetPay();
+            
+            // Count attendance types
+            String attendance = emp.getAttendance();
+            if ("Present".equals(attendance)) {
+                presentDays++;
+            } else if ("Absent".equals(attendance)) {
+                absentDays++;
+            } else {
+                leaveDays++;
+            }
+        }
+        
+        JTable attendanceTable = new JTable(data, columnNames);
+        attendanceTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        attendanceTable.getTableHeader().setReorderingAllowed(false);
+        
+        // Set column widths
+        attendanceTable.getColumnModel().getColumn(0).setPreferredWidth(100); // Date
+        attendanceTable.getColumnModel().getColumn(1).setPreferredWidth(120); // Attendance
+        attendanceTable.getColumnModel().getColumn(2).setPreferredWidth(80);  // Hours
+        attendanceTable.getColumnModel().getColumn(3).setPreferredWidth(80);  // Overtime
+        attendanceTable.getColumnModel().getColumn(4).setPreferredWidth(100); // Gross Pay
+        attendanceTable.getColumnModel().getColumn(5).setPreferredWidth(80);  // SSS
+        attendanceTable.getColumnModel().getColumn(6).setPreferredWidth(80);  // PhilHealth
+        attendanceTable.getColumnModel().getColumn(7).setPreferredWidth(80);  // Pag-IBIG
+        attendanceTable.getColumnModel().getColumn(8).setPreferredWidth(80);  // Tax
+        attendanceTable.getColumnModel().getColumn(9).setPreferredWidth(100); // Net Pay
+        
+        JScrollPane scrollPane = new JScrollPane(attendanceTable);
+        
+        // Create summary panel
+        JPanel summaryPanel = new JPanel(new GridLayout(2, 5, 10, 5));
+        summaryPanel.setBorder(BorderFactory.createTitledBorder("Summary"));
+        
+        summaryPanel.add(new JLabel("Total Records: " + records.size()));
+        summaryPanel.add(new JLabel("Present Days: " + presentDays));
+        summaryPanel.add(new JLabel("Leave Days: " + leaveDays));
+        summaryPanel.add(new JLabel("Absent Days: " + absentDays));
+        summaryPanel.add(new JLabel(""));
+        
+        summaryPanel.add(new JLabel("Total Hours: " + String.format("%.2f", totalHours)));
+        summaryPanel.add(new JLabel("Total Overtime: " + String.format("%.2f", totalOvertime)));
+        summaryPanel.add(new JLabel("Total Gross Pay: ₱" + String.format("%.2f", totalGrossPay)));
+        summaryPanel.add(new JLabel("Total Net Pay: ₱" + String.format("%.2f", totalNetPay)));
+        summaryPanel.add(new JLabel(""));
+        
+        // Create buttons panel
+        JPanel buttonPanel = new JPanel(new FlowLayout());
+        JButton exportButton = new JButton("Export to CSV");
+        JButton closeButton = new JButton("Close");
+        
+        exportButton.addActionListener(e -> exportEmployeeAttendance(employeeId, employeeName, records));
+        closeButton.addActionListener(e -> attendanceFrame.dispose());
+        
+        buttonPanel.add(exportButton);
+        buttonPanel.add(closeButton);
+        
+        // Layout the frame
+        attendanceFrame.setLayout(new BorderLayout());
+        attendanceFrame.add(summaryPanel, BorderLayout.NORTH);
+        attendanceFrame.add(scrollPane, BorderLayout.CENTER);
+        attendanceFrame.add(buttonPanel, BorderLayout.SOUTH);
+        
+        attendanceFrame.setVisible(true);
+    }
+    
+    // Export Employee Attendance to CSV method (same as before)
+    private void exportEmployeeAttendance(String employeeId, String employeeName, List<Employee> records) {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save Employee Attendance Report");
+        fileChooser.setSelectedFile(new java.io.File(employeeId + "_" + employeeName.replaceAll("\\s+", "_") + "_Attendance.csv"));
+        
+        int userSelection = fileChooser.showSaveDialog(this);
+        
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            java.io.File fileToSave = fileChooser.getSelectedFile();
+            
+            if (!fileToSave.getAbsolutePath().toLowerCase().endsWith(".csv")) {
+                fileToSave = new java.io.File(fileToSave.getAbsolutePath() + ".csv");
+            }
+            
+            try (java.io.FileWriter csvWriter = new java.io.FileWriter(fileToSave)) {
+                // Write header
+                csvWriter.append("Employee Attendance Report\n");
+                csvWriter.append("Employee ID: " + employeeId + "\n");
+                csvWriter.append("Employee Name: " + employeeName + "\n");
+                csvWriter.append("Report Generated: " + LocalDate.now().format(dateFormatter) + "\n\n");
+                
+                // Write column headers
+                csvWriter.append("Date,Attendance,Hours Worked,Overtime,Gross Pay,SSS,PhilHealth,Pag-IBIG,Tax,Net Pay\n");
+                
+                // Write data rows
+                for (Employee emp : records) {
+                    csvWriter.append(emp.getDate().format(dateFormatter)).append(",");
+                    csvWriter.append(emp.getAttendance()).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getTotalHours())).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getOvertime())).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getGrossPay())).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getSssDeduction())).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getPhilhealthDeduction())).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getPagibigDeduction())).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getTaxDeduction())).append(",");
+                    csvWriter.append(String.format("%.2f", emp.getNetPay())).append("\n");
+                }
+                
+                JOptionPane.showMessageDialog(this,
+                    "Employee attendance report exported successfully to:\n" + fileToSave.getAbsolutePath(),
+                    "Export Successful", JOptionPane.INFORMATION_MESSAGE);
+                
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this,
+                    "Error exporting report: " + ex.getMessage(),
+                    "Export Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
     

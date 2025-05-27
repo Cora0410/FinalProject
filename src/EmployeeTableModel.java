@@ -225,6 +225,24 @@ public class EmployeeTableModel extends AbstractTableModel {
         }
         fireTableDataChanged();
     }
+    public void filterByEmployeeId(String employeeId) {
+    if (employeeId == null || employeeId.trim().isEmpty()) {
+        clearFilter();
+        return;
+    }
+    
+    // Set filter type to employee ID (we need to track this)
+    filterDate = null; // Clear date filter
+    filteredEmployees.clear();
+    
+    String searchId = employeeId.trim().toLowerCase();
+    for (Employee emp : employees) {
+        if (emp.getId() != null && emp.getId().toLowerCase().contains(searchId)) {
+            filteredEmployees.add(emp);
+        }
+    }
+    fireTableDataChanged();
+}
     
     public void clearFilter() {
         filterDate = null;
@@ -233,8 +251,8 @@ public class EmployeeTableModel extends AbstractTableModel {
     }
     
     public boolean isFiltered() {
-        return filterDate != null;
-    }
+    return filterDate != null || !filteredEmployees.isEmpty();
+}
     
     public LocalDate getCurrentFilterDate() {
         return filterDate;

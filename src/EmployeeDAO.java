@@ -383,68 +383,68 @@ public class EmployeeDAO {
     }
     
     public Employee getEmployeeForDate(String employeeId, LocalDate date) {
-        // Get the employee record for a specific date
-        String sql = "SELECT e.id, e.name, p.total_hours, p.overtime, p.wage, p.date, " +
-                     "p.sss_deduction, p.philhealth_deduction, p.pagibig_deduction, p.tax_deductions, " +
-                     "a.status " +
-                     "FROM employees e " +
-                     "LEFT JOIN payroll p ON e.id = p.employee_id AND p.date = ? " +
-                     "LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = ? " +
-                     "WHERE e.id = ?";
-        try (Connection conn = dbConfig.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
-            pstmt.setDate(1, java.sql.Date.valueOf(date));
-            pstmt.setDate(2, java.sql.Date.valueOf(date));
-            pstmt.setString(3, employeeId);
-            
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    Employee employee = new Employee();
-                    employee.setId(rs.getString("id"));
-                    employee.setName(rs.getString("name"));
-                    
-                    // Handle null values from LEFT JOIN
-                    double totalHours = rs.getDouble("total_hours");
-                    employee.setTotalHours(rs.wasNull() ? 0 : totalHours);
-                    
-                    double overtime = rs.getDouble("overtime");
-                    employee.setOvertime(rs.wasNull() ? 0 : overtime);
-                    
-                    double wage = rs.getDouble("wage");
-                    employee.setWage(rs.wasNull() ? 0 : wage);
-                    
-                    Date sqlDate = rs.getDate("date");
-                    if (sqlDate != null) {
-                        employee.setDate(sqlDate.toLocalDate());
-                    } else {
-                        employee.setDate(date);
-                    }
-                    
-                    // Get all deduction values with null checks
-                    double sssDeduction = rs.getDouble("sss_deduction");
-                    employee.setSssDeduction(rs.wasNull() ? 0 : sssDeduction);
-                    
-                    double philhealthDeduction = rs.getDouble("philhealth_deduction");
-                    employee.setPhilhealthDeduction(rs.wasNull() ? 0 : philhealthDeduction);
-                    
-                    double pagibigDeduction = rs.getDouble("pagibig_deduction");
-                    employee.setPagibigDeduction(rs.wasNull() ? 0 : pagibigDeduction);
-                    
-                    double taxDeduction = rs.getDouble("tax_deductions");
-                    employee.setTaxDeduction(rs.wasNull() ? 0 : taxDeduction);
-                    
-                    String status = rs.getString("status");
-                    employee.setAttendance(status != null ? status : "Present");
-                    
-                    return employee;
+    // Get the employee record for a specific date
+    String sql = "SELECT e.id, e.name, p.total_hours, p.overtime, p.wage, p.date, " +
+                 "p.sss_deduction, p.philhealth_deduction, p.pagibig_deduction, p.tax_deductions, " +
+                 "a.status " +
+                 "FROM employees e " +
+                 "INNER JOIN payroll p ON e.id = p.employee_id AND p.date = ? " +
+                 "LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = ? " +
+                 "WHERE e.id = ?";
+    try (Connection conn = dbConfig.getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        
+        pstmt.setDate(1, java.sql.Date.valueOf(date));
+        pstmt.setDate(2, java.sql.Date.valueOf(date));
+        pstmt.setString(3, employeeId);
+        
+        try (ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+                Employee employee = new Employee();
+                employee.setId(rs.getString("id"));
+                employee.setName(rs.getString("name"));
+                
+                // Handle null values from LEFT JOIN
+                double totalHours = rs.getDouble("total_hours");
+                employee.setTotalHours(rs.wasNull() ? 0 : totalHours);
+                
+                double overtime = rs.getDouble("overtime");
+                employee.setOvertime(rs.wasNull() ? 0 : overtime);
+                
+                double wage = rs.getDouble("wage");
+                employee.setWage(rs.wasNull() ? 0 : wage);
+                
+                Date sqlDate = rs.getDate("date");
+                if (sqlDate != null) {
+                    employee.setDate(sqlDate.toLocalDate());
+                } else {
+                    employee.setDate(date);
                 }
+                
+                // Get all deduction values with null checks
+                double sssDeduction = rs.getDouble("sss_deduction");
+                employee.setSssDeduction(rs.wasNull() ? 0 : sssDeduction);
+                
+                double philhealthDeduction = rs.getDouble("philhealth_deduction");
+                employee.setPhilhealthDeduction(rs.wasNull() ? 0 : philhealthDeduction);
+                
+                double pagibigDeduction = rs.getDouble("pagibig_deduction");
+                employee.setPagibigDeduction(rs.wasNull() ? 0 : pagibigDeduction);
+                
+                double taxDeduction = rs.getDouble("tax_deductions");
+                employee.setTaxDeduction(rs.wasNull() ? 0 : taxDeduction);
+                
+                String status = rs.getString("status");
+                employee.setAttendance(status != null ? status : "Present");
+                
+                return employee;
             }
-        } catch (SQLException e) {
-            System.err.println("Error getting employee for date: " + e.getMessage());
         }
-        return null;
+    } catch (SQLException e) {
+        System.err.println("Error getting employee for date: " + e.getMessage());
     }
+    return null;
+}
     
     public List<Employee> getAllEmployees() {
         // Get basic employee info without payroll details
@@ -466,6 +466,7 @@ public class EmployeeDAO {
         }
         return employees;
     }
+    
     
     public List<Employee> getEmployeesWithPayroll() {
         // Get the most recent payroll records for all employees
@@ -526,6 +527,7 @@ public class EmployeeDAO {
         return employees;
     }
     
+    
     public List<Employee> getEmployeesForDate(LocalDate date) {
         // Get payroll records for all employees for a specific date
         List<Employee> employees = new ArrayList<>();
@@ -583,6 +585,68 @@ public class EmployeeDAO {
         }
         return employees;
     }
+    public List<Employee> getAllRecordsForEmployee(String employeeId) {
+    // Get all payroll and attendance records for a specific employee
+    List<Employee> employees = new ArrayList<>();
+    String sql = "SELECT e.id, e.name, p.total_hours, p.overtime, p.wage, p.date, " +
+                 "p.sss_deduction, p.philhealth_deduction, p.pagibig_deduction, p.tax_deductions, " +
+                 "a.status " +
+                 "FROM employees e " +
+                 "INNER JOIN payroll p ON e.id = p.employee_id " +
+                 "LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = p.date " +
+                 "WHERE e.id = ? " +
+                 "ORDER BY p.date DESC";
+    
+    try (Connection conn = dbConfig.getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        
+        pstmt.setString(1, employeeId);
+        
+        try (ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                Employee employee = new Employee();
+                employee.setId(rs.getString("id"));
+                employee.setName(rs.getString("name"));
+                
+                double totalHours = rs.getDouble("total_hours");
+                employee.setTotalHours(totalHours);
+                
+                double overtime = rs.getDouble("overtime");
+                employee.setOvertime(overtime);
+                
+                double wage = rs.getDouble("wage");
+                employee.setWage(wage);
+                
+                Date date = rs.getDate("date");
+                if (date != null) {
+                    employee.setDate(date.toLocalDate());
+                } else {
+                    employee.setDate(LocalDate.now());
+                }
+                
+                double sssDeduction = rs.getDouble("sss_deduction");
+                employee.setSssDeduction(sssDeduction);
+                
+                double philhealthDeduction = rs.getDouble("philhealth_deduction");
+                employee.setPhilhealthDeduction(philhealthDeduction);
+                
+                double pagibigDeduction = rs.getDouble("pagibig_deduction");
+                employee.setPagibigDeduction(pagibigDeduction);
+                
+                double taxDeduction = rs.getDouble("tax_deductions");
+                employee.setTaxDeduction(taxDeduction);
+                
+                String status = rs.getString("status");
+                employee.setAttendance(status != null ? status : "Present");
+                
+                employees.add(employee);
+            }
+        }
+    } catch (SQLException e) {
+        System.err.println("Error getting all records for employee: " + e.getMessage());
+    }
+    return employees;
+}
     
     public List<Employee> getEmployeesForDateRange(LocalDate startDate, LocalDate endDate) {
         // Get payroll records for all employees for a date range
