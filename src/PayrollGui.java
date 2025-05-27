@@ -6,8 +6,9 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public class PayrollGui extends JFrame {
-    JLabel employeeName, employeeId, hourlyRateLabel, maxHoursLabel, hoursWorkedLabel, dateLabel;
+    JLabel employeeName, employeeId, hourlyRateLabel, maxHoursLabel, hoursWorkedLabel, dateLabel, attendanceLabel;
     JTextField employeeNameField, employeeIdField, hourlyRateField, maxHoursField, hoursWorkedField, dateField;
+    JComboBox<String> attendanceComboBox;
     
     JLabel sssLabel, philhealthLabel, pagibigLabel, taxLabel;
     JTextField sssField, philhealthField, pagibigField, taxField;
@@ -34,6 +35,20 @@ public class PayrollGui extends JFrame {
     
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     
+    // Attendance options
+    private final String[] attendanceOptions = {
+        "Present", "Sick Leave", "Vacation Leave", 
+        "Maternity Leave", "Paternity Leave", "Absent"
+    };
+    
+    // Leave types that are paid
+    private final String[] paidLeaveTypes = {
+        "Sick Leave", "Vacation Leave", "Maternity Leave", "Paternity Leave"
+    };
+    
+    // Maximum leaves allowed per year
+    private final int MAX_LEAVES_PER_YEAR = 6;
+    
     public PayrollGui() {
         setTitle("Philippine Payroll Management System");
         
@@ -45,6 +60,7 @@ public class PayrollGui extends JFrame {
         maxHoursLabel = new JLabel("Maximum Hours:");
         hoursWorkedLabel = new JLabel("Hours Worked:");
         dateLabel = new JLabel("Date (YYYY-MM-DD):");
+        attendanceLabel = new JLabel("Attendance:");
         
         employeeNameField = new JTextField(20);
         employeeIdField = new JTextField(20);
@@ -52,18 +68,25 @@ public class PayrollGui extends JFrame {
         maxHoursField = new JTextField(20);
         hoursWorkedField = new JTextField(20);
         dateField = new JTextField(20);
+        attendanceComboBox = new JComboBox<>(attendanceOptions);
         
         dateField.setText(LocalDate.now().format(dateFormatter));
         
-        sssLabel = new JLabel("SSS Deduction:");
-        philhealthLabel = new JLabel("PhilHealth Deduction:");
-        pagibigLabel = new JLabel("Pag-IBIG Deduction:");
+        sssLabel = new JLabel("SSS Deduction (5%):");
+        philhealthLabel = new JLabel("PhilHealth Deduction (2.5%):");
+        pagibigLabel = new JLabel("Pag-IBIG Deduction (2%):");
         taxLabel = new JLabel("Tax Deduction:");
         
         sssField = new JTextField(20);
         philhealthField = new JTextField(20);
         pagibigField = new JTextField(20);
         taxField = new JTextField(20);
+        
+        // Make deduction fields non-editable since they're calculated
+        sssField.setEditable(false);
+        philhealthField.setEditable(false);
+        pagibigField.setEditable(false);
+        taxField.setEditable(false);
         
         totalDeductionLabel = new JLabel("Total Deduction:");
         grossPayLabel = new JLabel("Gross Pay:");
@@ -110,7 +133,7 @@ public class PayrollGui extends JFrame {
         employeeInfoPanel.setBorder(BorderFactory.createTitledBorder("Employee Information"));
         
         JPanel deductionPanel = new JPanel(new GridBagLayout());
-        deductionPanel.setBorder(BorderFactory.createTitledBorder("Deductions"));
+        deductionPanel.setBorder(BorderFactory.createTitledBorder("Deductions (Auto-calculated)"));
         
         GridBagConstraints gbcInfo = new GridBagConstraints();
         gbcInfo.insets = new Insets(3, 3, 3, 3);
@@ -153,7 +176,13 @@ public class PayrollGui extends JFrame {
         gbcInfo.gridx = 1; gbcInfo.weightx = 1.0;
         employeeInfoPanel.add(dateField, gbcInfo);
         
-        gbcInfo.gridx = 0; gbcInfo.gridy = 6; gbcInfo.gridwidth = 2;
+        gbcInfo.gridx = 0; gbcInfo.gridy = 6; gbcInfo.weightx = 0.0;
+        employeeInfoPanel.add(attendanceLabel, gbcInfo);
+        
+        gbcInfo.gridx = 1; gbcInfo.weightx = 1.0;
+        employeeInfoPanel.add(attendanceComboBox, gbcInfo);
+        
+        gbcInfo.gridx = 0; gbcInfo.gridy = 7; gbcInfo.gridwidth = 2;
         gbcInfo.fill = GridBagConstraints.NONE; gbcInfo.anchor = GridBagConstraints.CENTER;
         employeeInfoPanel.add(allowOvertimeToggle, gbcInfo);
         
@@ -252,46 +281,61 @@ public class PayrollGui extends JFrame {
         gbc.fill = GridBagConstraints.BOTH; gbc.weighty = 1.0;
         container.add(tableScrollPane, gbc);
         
+        // Add listener for attendance combo box to enable/disable overtime
+        attendanceComboBox.addActionListener(e -> {
+            String selectedAttendance = (String) attendanceComboBox.getSelectedItem();
+            boolean isLeave = isLeaveType(selectedAttendance);
+            allowOvertimeToggle.setEnabled(!isLeave);
+            if (isLeave) {
+                allowOvertimeToggle.setSelected(false);
+            }
+        });
+        
         calculateDeductionsButton.addActionListener(e -> {
             try {
+                String selectedAttendance = (String) attendanceComboBox.getSelectedItem();
                 double hourlyRate = Double.parseDouble(hourlyRateField.getText());
                 double maxHours = Double.parseDouble(maxHoursField.getText());
                 double hoursWorked = Double.parseDouble(hoursWorkedField.getText());
                 
                 double hoursForPayment;
                 double overtimeHours = 0;
+                double wage;
                 
-                if (allowOvertimeToggle.isSelected()) {
-                    hoursForPayment = hoursWorked;
-                    if (hoursWorked > maxHours) {
-                        overtimeHours = hoursWorked - maxHours;
-                    }
+                if ("Absent".equals(selectedAttendance)) {
+                    // Absent = not paid, all values are 0
+                    hoursForPayment = 0;
+                    overtimeHours = 0;
+                    wage = 0;
+                } else if (isLeaveType(selectedAttendance)) {
+                    // All leaves are paid to maximum hours only, no overtime
+                    hoursForPayment = maxHours;
+                    overtimeHours = 0;
+                    wage = hourlyRate * hoursForPayment;
                 } else {
-                    hoursForPayment = Math.min(hoursWorked, maxHours);
+                    // Present - normal calculation
+                    if (allowOvertimeToggle.isSelected()) {
+                        hoursForPayment = hoursWorked;
+                        if (hoursWorked > maxHours) {
+                            overtimeHours = hoursWorked - maxHours;
+                        }
+                    } else {
+                        hoursForPayment = Math.min(hoursWorked, maxHours);
+                    }
+                    wage = hourlyRate * hoursForPayment;
                 }
                 
-                double wage = hourlyRate * hoursForPayment;
                 grossPayField.setText(String.format("%.2f", wage));
                 
-                double sss = 0;
-                double philhealth = 0;
-                double pagibig = 0;
-                double tax = 0;
+                // Calculate percentage-based deductions
+                Employee.DeductionCalculation calc = Employee.calculateDeductions(wage);
                 
-                if (!sssField.getText().isEmpty()) {
-                    sss = Double.parseDouble(sssField.getText());
-                }
-                if (!philhealthField.getText().isEmpty()) {
-                    philhealth = Double.parseDouble(philhealthField.getText());
-                }
-                if (!pagibigField.getText().isEmpty()) {
-                    pagibig = Double.parseDouble(pagibigField.getText());
-                }
-                if (!taxField.getText().isEmpty()) {
-                    tax = Double.parseDouble(taxField.getText());
-                }
+                sssField.setText(String.format("%.2f", calc.sssDeduction));
+                philhealthField.setText(String.format("%.2f", calc.philhealthDeduction));
+                pagibigField.setText(String.format("%.2f", calc.pagibigDeduction));
+                taxField.setText(String.format("%.2f", calc.taxDeduction));
                 
-                double totalDeduction = sss + philhealth + pagibig + tax;
+                double totalDeduction = calc.getTotalDeduction();
                 totalDeductionField.setText(String.format("%.2f", totalDeduction));
                 
                 double netPay = wage - totalDeduction;
@@ -309,6 +353,7 @@ public class PayrollGui extends JFrame {
             clearFields();
             maxHoursField.setText("40");
             allowOvertimeToggle.setSelected(false);
+            attendanceComboBox.setSelectedIndex(0); // Present
             dateField.setText(LocalDate.now().format(dateFormatter));
         });
         
@@ -355,6 +400,7 @@ public class PayrollGui extends JFrame {
             String maxHoursText = maxHoursField.getText();
             String hoursWorkedText = hoursWorkedField.getText();
             String dateText = dateField.getText();
+            String selectedAttendance = (String) attendanceComboBox.getSelectedItem();
             
             try {
                 LocalDate localDate = LocalDate.parse(dateText, dateFormatter);
@@ -368,6 +414,18 @@ public class PayrollGui extends JFrame {
                     return;
                 }
                 
+                // Check leave limit if it's a leave type
+                if (isLeaveType(selectedAttendance)) {
+                    int currentLeaveCount = employeeDAO.getLeaveCountForYear(id, localDate.getYear());
+                    if (currentLeaveCount >= MAX_LEAVES_PER_YEAR) {
+                        JOptionPane.showMessageDialog(this, 
+                            "Employee has reached maximum leave limit of " + MAX_LEAVES_PER_YEAR + " for this year.\n" +
+                            "Current leave count: " + currentLeaveCount, 
+                            "Leave Limit Exceeded", JOptionPane.WARNING_MESSAGE);
+                        return;
+                    }
+                }
+                
                 if (!name.isEmpty() && !id.isEmpty() && !hourlyRateText.isEmpty() 
                     && !maxHoursText.isEmpty() && !hoursWorkedText.isEmpty()) {
                     try {
@@ -377,38 +435,37 @@ public class PayrollGui extends JFrame {
                         
                         double hoursForPayment;
                         double overtimeHours = 0;
+                        double wage;
                         
-                        if (allowOvertimeToggle.isSelected()) {
-                            hoursForPayment = hoursWorked;
-                            if (hoursWorked > maxHours) {
-                                overtimeHours = hoursWorked - maxHours;
-                            }
+                        if ("Absent".equals(selectedAttendance)) {
+                            // Absent = not paid
+                            hoursForPayment = 0;
+                            overtimeHours = 0;
+                            wage = 0;
+                        } else if (isLeaveType(selectedAttendance)) {
+                            // All leaves are paid to maximum hours only
+                            hoursForPayment = maxHours;
+                            overtimeHours = 0;
+                            wage = rate * hoursForPayment;
                         } else {
-                            hoursForPayment = Math.min(hoursWorked, maxHours);
+                            // Present - normal calculation
+                            if (allowOvertimeToggle.isSelected()) {
+                                hoursForPayment = hoursWorked;
+                                if (hoursWorked > maxHours) {
+                                    overtimeHours = hoursWorked - maxHours;
+                                }
+                            } else {
+                                hoursForPayment = Math.min(hoursWorked, maxHours);
+                            }
+                            wage = rate * hoursForPayment;
                         }
                         
-                        double wage = rate * hoursForPayment;
-                        
-                        double sss = 0;
-                        double philhealth = 0;
-                        double pagibig = 0;
-                        double tax = 0;
-                        
-                        if (!sssField.getText().isEmpty()) {
-                            sss = Double.parseDouble(sssField.getText());
-                        }
-                        if (!philhealthField.getText().isEmpty()) {
-                            philhealth = Double.parseDouble(philhealthField.getText());
-                        }
-                        if (!pagibigField.getText().isEmpty()) {
-                            pagibig = Double.parseDouble(pagibigField.getText());
-                        }
-                        if (!taxField.getText().isEmpty()) {
-                            tax = Double.parseDouble(taxField.getText());
-                        }
+                        // Calculate percentage-based deductions
+                        Employee.DeductionCalculation calc = Employee.calculateDeductions(wage);
                         
                         Employee employee = new Employee(id, name, hoursForPayment, overtimeHours, 
-                                               wage, localDate, sss, philhealth, pagibig, tax, "Present");
+                                               wage, localDate, calc.sssDeduction, calc.philhealthDeduction, 
+                                               calc.pagibigDeduction, calc.taxDeduction, selectedAttendance);
                         
                         if (employeeDAO.addEmployee(employee)) {
                             tableModel.addEmployee(employee);
@@ -441,6 +498,7 @@ public class PayrollGui extends JFrame {
                 String maxHoursText = maxHoursField.getText();
                 String hoursWorkedText = hoursWorkedField.getText();
                 String dateText = dateField.getText();
+                String selectedAttendance = (String) attendanceComboBox.getSelectedItem();
                 
                 try {
                     LocalDate localDate = LocalDate.parse(dateText, dateFormatter);
@@ -457,6 +515,19 @@ public class PayrollGui extends JFrame {
                         }
                     }
                     
+                    // Check leave limit if changing to a leave type and it's a different employee or different leave type
+                    if (isLeaveType(selectedAttendance) && 
+                        (!selectedAttendance.equals(currentEmployee.getAttendance()) || !id.equals(currentEmployee.getId()))) {
+                        int currentLeaveCount = employeeDAO.getLeaveCountForYear(id, localDate.getYear());
+                        if (currentLeaveCount >= MAX_LEAVES_PER_YEAR) {
+                            JOptionPane.showMessageDialog(this, 
+                                "Employee has reached maximum leave limit of " + MAX_LEAVES_PER_YEAR + " for this year.\n" +
+                                "Current leave count: " + currentLeaveCount, 
+                                "Leave Limit Exceeded", JOptionPane.WARNING_MESSAGE);
+                            return;
+                        }
+                    }
+                    
                     if (!name.isEmpty() && !id.isEmpty() && !hourlyRateText.isEmpty() 
                         && !maxHoursText.isEmpty() && !hoursWorkedText.isEmpty()) {
                         try {
@@ -466,35 +537,33 @@ public class PayrollGui extends JFrame {
                             
                             double hoursForPayment;
                             double overtimeHours = 0;
+                            double wage;
                             
-                            if (allowOvertimeToggle.isSelected()) {
-                                hoursForPayment = hoursWorked;
-                                if (hoursWorked > maxHours) {
-                                    overtimeHours = hoursWorked - maxHours;
-                                }
+                            if ("Absent".equals(selectedAttendance)) {
+                                // Absent = not paid
+                                hoursForPayment = 0;
+                                overtimeHours = 0;
+                                wage = 0;
+                            } else if (isLeaveType(selectedAttendance)) {
+                                // All leaves are paid to maximum hours only
+                                hoursForPayment = maxHours;
+                                overtimeHours = 0;
+                                wage = rate * hoursForPayment;
                             } else {
-                                hoursForPayment = Math.min(hoursWorked, maxHours);
+                                // Present - normal calculation
+                                if (allowOvertimeToggle.isSelected()) {
+                                    hoursForPayment = hoursWorked;
+                                    if (hoursWorked > maxHours) {
+                                        overtimeHours = hoursWorked - maxHours;
+                                    }
+                                } else {
+                                    hoursForPayment = Math.min(hoursWorked, maxHours);
+                                }
+                                wage = rate * hoursForPayment;
                             }
                             
-                            double wage = rate * hoursForPayment;
-                            
-                            double sss = 0;
-                            double philhealth = 0;
-                            double pagibig = 0;
-                            double tax = 0;
-                            
-                            if (!sssField.getText().isEmpty()) {
-                                sss = Double.parseDouble(sssField.getText());
-                            }
-                            if (!philhealthField.getText().isEmpty()) {
-                                philhealth = Double.parseDouble(philhealthField.getText());
-                            }
-                            if (!pagibigField.getText().isEmpty()) {
-                                pagibig = Double.parseDouble(pagibigField.getText());
-                            }
-                            if (!taxField.getText().isEmpty()) {
-                                tax = Double.parseDouble(taxField.getText());
-                            }
+                            // Calculate percentage-based deductions
+                            Employee.DeductionCalculation calc = Employee.calculateDeductions(wage);
                             
                             Employee employee = tableModel.getEmployee(selectedRow);
                             employee.setName(name);
@@ -503,10 +572,11 @@ public class PayrollGui extends JFrame {
                             employee.setOvertime(overtimeHours);
                             employee.setWage(wage);
                             employee.setDate(localDate);
-                            employee.setSssDeduction(sss);
-                            employee.setPhilhealthDeduction(philhealth);
-                            employee.setPagibigDeduction(pagibig);
-                            employee.setTaxDeduction(tax);
+                            employee.setSssDeduction(calc.sssDeduction);
+                            employee.setPhilhealthDeduction(calc.philhealthDeduction);
+                            employee.setPagibigDeduction(calc.pagibigDeduction);
+                            employee.setTaxDeduction(calc.taxDeduction);
+                            employee.setAttendance(selectedAttendance);
                             
                             if (employeeDAO.updateEmployee(employee)) {
                                 tableModel.updateEmployee(selectedRow, employee);
@@ -577,21 +647,21 @@ public class PayrollGui extends JFrame {
         
         generateReport.addActionListener(e -> {
             ReportGenerator reportGenerator = new ReportGenerator(employeeDAO);
-    reportGenerator.setVisible(true);
+            reportGenerator.setVisible(true);
         });
         
         generatePayslip.addActionListener(e -> {
-    int selectedRow = employeeTable.getSelectedRow();
-    if (selectedRow >= 0) {
-        Employee employee = tableModel.getEmployee(selectedRow);
-        PayslipGenerator payslipGenerator = new PayslipGenerator(employee, this);
-        payslipGenerator.generateAndShowPayslip();
-    } else {
-        JOptionPane.showMessageDialog(this, 
-            "Please select an employee to generate a payslip.", 
-            "No Selection", JOptionPane.WARNING_MESSAGE);
-    }
-});
+            int selectedRow = employeeTable.getSelectedRow();
+            if (selectedRow >= 0) {
+                Employee employee = tableModel.getEmployee(selectedRow);
+                PayslipGenerator payslipGenerator = new PayslipGenerator(employee, this);
+                payslipGenerator.generateAndShowPayslip();
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Please select an employee to generate a payslip.", 
+                    "No Selection", JOptionPane.WARNING_MESSAGE);
+            }
+        });
         
         employeeTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -622,6 +692,9 @@ public class PayrollGui extends JFrame {
                     if (maxHoursField.getText().isEmpty()) {
                         maxHoursField.setText("40");
                     }
+                    
+                    // Set attendance combo box
+                    attendanceComboBox.setSelectedItem(employee.getAttendance());
                     
                     allowOvertimeToggle.setSelected(overtime > 0);
                     
@@ -654,6 +727,15 @@ public class PayrollGui extends JFrame {
         }
     }
     
+    private boolean isLeaveType(String attendanceType) {
+        for (String leave : paidLeaveTypes) {
+            if (leave.equals(attendanceType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     private void clearFields() {
         employeeNameField.setText("");
         employeeIdField.setText("");
@@ -666,6 +748,7 @@ public class PayrollGui extends JFrame {
         totalDeductionField.setText("");
         grossPayField.setText("");
         netPayField.setText("");
+        attendanceComboBox.setSelectedIndex(0); // Present
     }
     
     private void loadEmployeesFromDatabase() {

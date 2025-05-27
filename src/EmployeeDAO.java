@@ -6,8 +6,34 @@ import java.util.List;
 public class EmployeeDAO {
     private DatabaseConfig dbConfig;
     
+    // Leave types that count towards the limit
+    private final String[] leaveTypes = {
+        "Sick Leave", "Vacation Leave", "Maternity Leave", "Paternity Leave"
+    };
+    
     public EmployeeDAO() {
         dbConfig = DatabaseConfig.getInstance();
+    }
+    
+    public int getLeaveCountForYear(String employeeId, int year) {
+        String sql = "SELECT COUNT(*) FROM attendance WHERE employee_id = ? " +
+                     "AND YEAR(date) = ? AND status IN ('Sick Leave', 'Vacation Leave', 'Maternity Leave', 'Paternity Leave')";
+        
+        try (Connection conn = dbConfig.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setString(1, employeeId);
+            pstmt.setInt(2, year);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting leave count: " + e.getMessage());
+        }
+        return 0;
     }
     
     public boolean addEmployee(Employee employee) {

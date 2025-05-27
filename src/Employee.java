@@ -16,6 +16,30 @@ public class Employee {
     private double netPay;
     private String attendance;
     
+    // Philippine deduction rates
+    public static final double SSS_EMPLOYEE_RATE = 0.05;  // 5%
+    public static final double PHILHEALTH_EMPLOYEE_RATE = 0.025;  // 2.5%
+    public static final double PAGIBIG_EMPLOYEE_RATE = 0.02;  // 2%
+    public static final double PAGIBIG_CAP = 10000.0;  // Monthly compensation cap for Pag-IBIG
+    
+    public static class DeductionCalculation {
+        public double sssDeduction;
+        public double philhealthDeduction;
+        public double pagibigDeduction;
+        public double taxDeduction;
+        
+        public DeductionCalculation(double sss, double philhealth, double pagibig, double tax) {
+            this.sssDeduction = sss;
+            this.philhealthDeduction = philhealth;
+            this.pagibigDeduction = pagibig;
+            this.taxDeduction = tax;
+        }
+        
+        public double getTotalDeduction() {
+            return sssDeduction + philhealthDeduction + pagibigDeduction + taxDeduction;
+        }
+    }
+    
     public Employee() {
         this.date = LocalDate.now(); // Default to current date
     }
@@ -39,6 +63,59 @@ public class Employee {
         
         // Calculate derived fields
         calculateDerivedFields();
+    }
+    
+    public static DeductionCalculation calculateDeductions(double monthlyWage) {
+        if (monthlyWage <= 0) {
+            return new DeductionCalculation(0, 0, 0, 0);
+        }
+        
+        // SSS Deduction (5% of wage, with MSC range ₱4,250 to ₱29,750)
+        double sssBase = Math.max(4250, Math.min(monthlyWage, 29750));
+        double sssDeduction = sssBase * SSS_EMPLOYEE_RATE;
+        
+        // PhilHealth Deduction (2.5% of wage, cap at ₱100,000)
+        double philhealthBase = Math.min(monthlyWage, 100000);
+        double philhealthDeduction = philhealthBase * PHILHEALTH_EMPLOYEE_RATE;
+        
+        // Pag-IBIG Deduction (2% of wage, cap at ₱10,000)
+        double pagibigBase = Math.min(monthlyWage, PAGIBIG_CAP);
+        double pagibigDeduction = pagibigBase * PAGIBIG_EMPLOYEE_RATE;
+        
+        // Income Tax calculation based on TRAIN Law
+        double taxDeduction = calculateIncomeTax(monthlyWage);
+        
+        return new DeductionCalculation(sssDeduction, philhealthDeduction, pagibigDeduction, taxDeduction);
+    }
+    
+    private static double calculateIncomeTax(double monthlyWage) {
+        // Convert monthly to annual for tax calculation
+        double annualSalary = monthlyWage * 12;
+        
+        double annualTax = 0;
+        
+        if (annualSalary <= 250000) {
+            // Tax-exempt
+            annualTax = 0;
+        } else if (annualSalary <= 400000) {
+            // 15% of excess over ₱250,000
+            annualTax = (annualSalary - 250000) * 0.15;
+        } else if (annualSalary <= 800000) {
+            // ₱22,500 + 20% of excess over ₱400,000
+            annualTax = 22500 + (annualSalary - 400000) * 0.20;
+        } else if (annualSalary <= 2000000) {
+            // ₱102,500 + 25% of excess over ₱800,000
+            annualTax = 102500 + (annualSalary - 800000) * 0.25;
+        } else if (annualSalary <= 8000000) {
+            // ₱402,500 + 30% of excess over ₱2,000,000
+            annualTax = 402500 + (annualSalary - 2000000) * 0.30;
+        } else {
+            // ₱2,202,500 + 35% of excess over ₱8,000,000
+            annualTax = 2202500 + (annualSalary - 8000000) * 0.35;
+        }
+        
+        // Convert back to monthly tax
+        return annualTax / 12;
     }
     
     private void calculateDerivedFields() {
